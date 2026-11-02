@@ -74,7 +74,8 @@ create table public.book_editions (
   language          text,
   created_at        timestamptz not null default now(),
   check (google_books_id is not null or open_library_id is not null
-         or isbn_13 is not null or isbn_10 is not null)
+         or isbn_13 is not null or isbn_10 is not null),
+  unique (id, book_id)  -- target of user_books' composite FK
 );
 create index book_editions_book on public.book_editions (book_id);
 create index book_editions_isbn13 on public.book_editions (isbn_13);
@@ -96,6 +97,8 @@ create table public.user_books (
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now(),
   unique (user_id, book_id),
+  -- the chosen edition must belong to the chosen work
+  foreign key (edition_id, book_id) references public.book_editions (id, book_id),
   check (finished_at is null or started_at is null or finished_at >= started_at)
 );
 create index user_books_user_created on public.user_books (user_id, created_at desc);
