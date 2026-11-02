@@ -11,7 +11,7 @@ import '../features/reading/domain/reading_session.dart';
 import '../features/reviews/domain/review.dart';
 import '../features/social/domain/activity.dart';
 
-/// Repository contracts. Each has a Supabase and a demo implementation.
+/// Repository contracts, implemented against Supabase (and the catalog APIs).
 /// All methods throw [AppFailure] on error.
 
 enum SignUpResult { signedIn, confirmEmail }
@@ -23,12 +23,14 @@ abstract interface class AuthRepository {
   Future<void> signIn({required String email, required String password});
   Future<SignUpResult> signUp({required String email, required String password});
   Future<void> sendPasswordReset(String email);
+
+  /// Fires when the app is opened from a password-reset link (the user is then signed in).
+  Stream<void> passwordRecoveries();
+  Future<void> updatePassword(String password);
   Future<void> signOut();
 }
 
 abstract interface class ProfileRepository {
-  /// False when the backend has no file storage (demo mode).
-  bool get canUploadAvatars;
   Future<Profile> getProfile(String userId);
   Future<Profile> updateProfile(Profile profile);
   Future<bool> isUsernameAvailable(String username, {required String exceptUserId});

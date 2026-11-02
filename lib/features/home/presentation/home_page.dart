@@ -35,6 +35,15 @@ class _HomeView extends StatefulWidget {
 class _HomeViewState extends State<_HomeView> {
   bool _requested = false;
 
+  /// Kept across rebuilds so the carousel stays on the book the reader swiped to.
+  final _readingPages = PageController(viewportFraction: 0.9);
+
+  @override
+  void dispose() {
+    _readingPages.dispose();
+    super.dispose();
+  }
+
   Future<void> _load() async {
     final me = context.read<SessionCubit>().profile;
     if (me == null) return;
@@ -115,15 +124,20 @@ class _HomeViewState extends State<_HomeView> {
                 else
                   SizedBox(
                     height: 190 * MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.4),
-                    child: PageView.builder(
-                      controller: PageController(viewportFraction: reading.length > 1 ? 0.9 : 1),
-                      padEnds: false,
-                      itemCount: reading.length,
-                      itemBuilder: (_, i) => Padding(
-                        padding: const EdgeInsets.only(left: Space.gutter, right: Space.xs),
-                        child: _CurrentlyReadingCard(key: ValueKey(reading[i].id), entry: reading[i]),
-                      ),
-                    ),
+                    child: reading.length == 1
+                        ? Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
+                            child: _CurrentlyReadingCard(key: ValueKey(reading[0].id), entry: reading[0]),
+                          )
+                        : PageView.builder(
+                            controller: _readingPages,
+                            padEnds: false,
+                            itemCount: reading.length,
+                            itemBuilder: (_, i) => Padding(
+                              padding: const EdgeInsets.only(left: Space.gutter, right: Space.xs),
+                              child: _CurrentlyReadingCard(key: ValueKey(reading[i].id), entry: reading[i]),
+                            ),
+                          ),
                   ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(Space.gutter, Space.md, Space.gutter, 0),

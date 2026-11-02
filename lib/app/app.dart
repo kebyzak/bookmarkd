@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../core/config/app_config.dart';
-import '../core/widgets/common.dart';
+import '../core/services/recent_searches_store.dart';
 import '../features/auth/presentation/session_cubit.dart';
 import '../features/library/presentation/library_cubit.dart';
 import 'di.dart';
@@ -33,7 +32,6 @@ class _BookmarkdAppState extends State<BookmarkdApp> {
 
   @override
   Widget build(BuildContext context) {
-    final demo = sl<AppConfig>().mode == AppMode.demo;
     return MultiBlocProvider(
       providers: [
         BlocProvider.value(value: _session),
@@ -45,6 +43,8 @@ class _BookmarkdAppState extends State<BookmarkdApp> {
         listener: (_, state) {
           final id = _userId(state);
           id == null ? _library.clear() : _library.load(id);
+          // Recently viewed books are per device; don't show them to the next account.
+          if (state is SignedOut) sl<RecentSearchesStore>().clear();
         },
         child: MaterialApp.router(
           title: 'Bookmarkd',
@@ -52,18 +52,6 @@ class _BookmarkdAppState extends State<BookmarkdApp> {
           theme: AppTheme.light(fontFamily: widget.fontFamily),
           themeMode: ThemeMode.light,
           routerConfig: _router,
-          builder: (context, child) => demo
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const DemoBanner(),
-                    // The banner already consumed the top safe area.
-                    Expanded(
-                      child: MediaQuery.removePadding(context: context, removeTop: true, child: child!),
-                    ),
-                  ],
-                )
-              : child!,
         ),
       ),
     );

@@ -121,24 +121,3 @@ class SurfaceCard extends StatelessWidget {
     ),
   );
 }
-
-/// Shown on every screen in demo mode so sample data is never mistaken for live data.
-class DemoBanner extends StatelessWidget {
-  const DemoBanner({super.key});
-
-  @override
-  Widget build(BuildContext context) => Material(
-    color: AppColors.textPrimary,
-    child: SafeArea(
-      bottom: false,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Text(
-          'Demo mode · sample data, nothing is saved to a server',
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.white, letterSpacing: 0.2),
-        ),
-      ),
-    ),
-  );
-}

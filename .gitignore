@@ -7,6 +7,7 @@
 .atom/
 .build/
 .buildlog/
+.claude/
 .history
 .svn/
 .swiftpm/
@@ -50,3 +51,8 @@ app.*.map.json
 # Local secrets and tooling
 .env
 .claude/launch.json
+
+# Android release signing
+android/key.properties
+*.jks
+*.keystore

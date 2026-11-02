@@ -21,6 +21,12 @@ Future<T> guardSupabase<T>(Future<T> Function() call) async {
       'PGRST116' || 'P0002' => const AppFailure.notFound(),
       _ => const AppFailure.unknown(),
     };
+  } on FunctionException catch (e) {
+    throw switch (e.status) {
+      401 => const AppFailure.unauthorized(),
+      404 => const AppFailure.notFound("The catalog doesn't have this book any more."),
+      _ => const AppFailure.unknown(),
+    };
   } on StorageException catch (e) {
     throw AppFailure(FailureKind.unknown, 'Upload failed: ${e.message}');
   } on SocketException {

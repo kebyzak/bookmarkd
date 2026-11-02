@@ -17,18 +17,15 @@ triggers, `security definer` RPCs). The mobile app only ever holds the anon key.
 | Layer | Contents | Rules |
 |---|---|---|
 | `domain/` | Immutable models, value objects, repository interfaces, pure functions | No Flutter, no Supabase imports |
-| `data/` | Supabase / HTTP / demo implementations of repositories, JSON mapping | Parses outside data once, throws `AppFailure` |
+| `data/` | Supabase / HTTP implementations of repositories, JSON mapping | Parses outside data once, throws `AppFailure` |
 | `presentation/` | Cubits, pages, widgets | Talks to repository interfaces only |
 
-### Run modes
+### Configuration
 
-`AppConfig` reads `--dart-define`s. If `SUPABASE_URL` and `SUPABASE_ANON_KEY`
-are both present the app runs **live**. Otherwise it runs in **demo mode**:
-every Supabase-backed repository is replaced by an in-memory implementation
-over one seeded `DemoStore`, and a persistent "Demo mode" banner is shown.
-The external catalog (Google Books / Open Library) is real in both modes.
+`AppConfig` reads `--dart-define`s (`--dart-define-from-file=.env`). `SUPABASE_URL` and
+`SUPABASE_PUBLISHABLE_KEY` are required; startup fails with a clear error without them.
 
-Dependency injection: `get_it`, configured once in `app/di.dart` per mode.
+Dependency injection: `get_it`, configured once in `app/di.dart` after `Supabase.initialize`.
 
 ## 2. Glossary
 
@@ -83,7 +80,7 @@ Server-side functions (all `security invoker` unless noted):
 
 | Function | Why it is a function |
 |---|---|
-| `upsert_catalog_book(jsonb)` *definer* | Clients cannot write `books`/`book_editions` directly; dedup is atomic. |
+| `upsert_catalog_book(jsonb)` *definer, service role only* | Called by the `save-book` Edge Function with server-fetched metadata; dedup is atomic. |
 | `log_reading_progress(...)` | Validates page against edition page count, updates entry + inserts session in one transaction. |
 | `get_feed(cursor_ts, cursor_id, page_size)` | Keyset-paginated, joined feed with like counts. |
 | `get_book_stats(book_id)` | Community average rating, rating count, reader count. |
@@ -118,7 +115,7 @@ signed-out → `/welcome`, needs onboarding → `/onboarding`).
 ## 6. Design system
 
 Tokens in `lib/app/theme/`: colors (below), spacing on an 4/8pt scale,
-radii 6/12/16, Inter type scale. Shadows: none except the bottom sheet.
+radii 6/12/16, NotoSans (bundled in assets/fonts) type scale. Shadows: none except the bottom sheet.
 
 | Token | Hex |
 |---|---|

@@ -33,22 +33,47 @@ class RatingStars extends StatelessWidget {
 }
 
 /// Half-star rating input: tap or drag across the stars.
-class RatingInput extends StatelessWidget {
+/// A drag only previews; [onChanged] fires once, when the finger lifts, so a
+/// swipe across the stars is one saved rating, not one per half star.
+class RatingInput extends StatefulWidget {
   const RatingInput({super.key, required this.value, required this.onChanged, this.size = 40});
 
   final Rating? value;
   final ValueChanged<Rating?> onChanged;
   final double size;
 
-  void _update(Offset local, {bool fromTap = false}) {
-    final halves = ((local.dx / size) * 2).ceil().clamp(1, 10);
+  @override
+  State<RatingInput> createState() => _RatingInputState();
+}
+
+class _RatingInputState extends State<RatingInput> {
+  /// Half stars under the finger during a drag; null when not dragging.
+  int? _dragging;
+
+  Rating? get value => widget.value;
+  ValueChanged<Rating?> get onChanged => widget.onChanged;
+  double get size => widget.size;
+
+  int _halvesAt(Offset local) => ((local.dx / size) * 2).ceil().clamp(1, 10);
+
+  void _tap(Offset local) {
+    final halves = _halvesAt(local);
+    HapticFeedback.selectionClick();
     // Tapping the current value clears it.
-    if (fromTap && value?.halfStars == halves) {
-      onChanged(null);
-    } else if (value?.halfStars != halves) {
-      HapticFeedback.selectionClick();
-      onChanged(Rating.fromHalfStars(halves));
-    }
+    onChanged(value?.halfStars == halves ? null : Rating.fromHalfStars(halves));
+  }
+
+  void _drag(Offset local) {
+    final halves = _halvesAt(local);
+    if (halves == _dragging) return;
+    HapticFeedback.selectionClick();
+    setState(() => _dragging = halves);
+  }
+
+  void _dragEnd() {
+    final halves = _dragging;
+    setState(() => _dragging = null);
+    if (halves != null && halves != value?.halfStars) onChanged(Rating.fromHalfStars(halves));
   }
 
   @override
@@ -62,10 +87,13 @@ class RatingInput extends StatelessWidget {
         onChanged(value == null || value!.halfStars <= 1 ? null : Rating.fromHalfStars(value!.halfStars - 1)),
     child: GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTapUp: (d) => _update(d.localPosition, fromTap: true),
-      onHorizontalDragUpdate: (d) => _update(d.localPosition),
+      onTapUp: (d) => _tap(d.localPosition),
+      onHorizontalDragStart: (d) => _drag(d.localPosition),
+      onHorizontalDragUpdate: (d) => _drag(d.localPosition),
+      onHorizontalDragEnd: (_) => _dragEnd(),
+      onHorizontalDragCancel: () => setState(() => _dragging = null),
       child: ExcludeSemantics(
-        child: RatingStars(stars: value?.stars ?? 0, size: size),
+        child: RatingStars(stars: _dragging != null ? _dragging! / 2 : value?.stars ?? 0, size: size),
       ),
     ),
   );

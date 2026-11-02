@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'tokens.dart';
 
 abstract final class AppTheme {
-  /// [fontFamily] is Inter in the app; tests use the default font.
+  /// [fontFamily] is the bundled NotoSans in the app; tests use the default font.
   static ThemeData light({String? fontFamily}) {
     const scheme = ColorScheme(
       brightness: Brightness.light,

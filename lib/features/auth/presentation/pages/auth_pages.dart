@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/di.dart';
@@ -7,6 +8,7 @@ import '../../../../app/theme/tokens.dart';
 import '../../../../core/errors/app_failure.dart';
 import '../../../../core/repositories.dart';
 import '../../../../core/widgets/states.dart';
+import '../session_cubit.dart';
 import 'brand_mark.dart';
 
 final _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
@@ -329,6 +331,44 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> with _Submittin
           onPressed: () => context.pop(),
           child: const Center(child: Text('Back to sign in')),
         ),
+    ],
+  );
+}
+
+/// Shown after opening a password-reset link; the user is signed in by the link.
+class ResetPasswordPage extends StatefulWidget {
+  const ResetPasswordPage({super.key});
+  @override
+  State<ResetPasswordPage> createState() => _ResetPasswordPageState();
+}
+
+class _ResetPasswordPageState extends State<ResetPasswordPage> with _Submitting {
+  final _form = GlobalKey<FormState>();
+  final _password = TextEditingController();
+
+  @override
+  void dispose() {
+    _password.dispose();
+    super.dispose();
+  }
+
+  Future<void> _go() async {
+    if (!_form.currentState!.validate()) return;
+    final ok = await submit(() => context.read<SessionCubit>().updatePassword(_password.text));
+    if (!ok || !mounted) return;
+    showMessage(context, 'Password updated');
+    context.go('/home');
+  }
+
+  @override
+  Widget build(BuildContext context) => _AuthScaffold(
+    title: 'Choose a new password',
+    subtitle: "You're signed in from the reset link. Set a new password to continue.",
+    formKey: _form,
+    children: [
+      _PasswordField(controller: _password, validator: validateNewPassword, onSubmitted: _go, newPassword: true),
+      const SizedBox(height: Space.lg),
+      _SubmitButton(label: 'Save password', busy: busy, onPressed: _go),
     ],
   );
 }

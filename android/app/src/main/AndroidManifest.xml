@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Release builds need this too; Flutter's template only adds it for debug/profile. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="bookmarkd"
+        android:label="Bookmarkd"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -23,6 +25,13 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <!-- Password-reset links from Supabase open the app. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.bookmarkd.bookmarkd" android:host="reset-password" />
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

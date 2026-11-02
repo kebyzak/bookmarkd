@@ -68,7 +68,13 @@ class SupabaseLibraryRepository implements LibraryRepository {
   Future<LibraryEntry> logProgress(String entryId, ProgressUpdate update) => guardSupabase(() async {
     await _client.rpc(
       'log_reading_progress',
-      params: {'p_user_book_id': entryId, 'p_current_page': update.page, 'p_progress_percent': update.percent},
+      params: {
+        'p_user_book_id': entryId,
+        'p_current_page': update.page,
+        'p_progress_percent': update.percent,
+        // The reader's local date (yyyy-MM-dd); the server clock is UTC.
+        'p_today': DateTime.now().toIso8601String().substring(0, 10),
+      },
     );
     final row = await _client.from('user_books').select(userBookSelect).eq('id', entryId).single();
     return entryFromRow(row);

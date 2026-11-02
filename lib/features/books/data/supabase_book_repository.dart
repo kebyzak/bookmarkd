@@ -11,7 +11,8 @@ class SupabaseBookRepository implements BookRepository {
 
   final SupabaseClient _client;
 
-  static const _select = '*, editions:book_editions(*)';
+  // Named FK: through user_books, books and book_editions are also linked many-to-many (PGRST201).
+  static const _select = '*, editions:book_editions!book_editions_book_id_fkey(*)';
 
   @override
   Future<Book> getStoredBook(String bookId) => guardSupabase(() async {
@@ -29,7 +30,7 @@ class SupabaseBookRepository implements BookRepository {
     if (filters.isEmpty) return null;
     final edition = await _client
         .from('book_editions')
-        .select('*, work:books(*)')
+        .select('*, work:books!book_editions_book_id_fkey(*)')
         .or(filters.join(','))
         .limit(1)
         .maybeSingle();
@@ -40,7 +41,12 @@ class SupabaseBookRepository implements BookRepository {
   @override
   Future<Book> save(Book book) => guardSupabase(() async {
     if (book.isStored) return book;
-    final ids = await _client.rpc('upsert_catalog_book', params: {'payload': book.toJson()}) as Map;
+    // Only ids are sent; the save-book Edge Function fetches trusted metadata itself.
+    final res = await _client.functions.invoke(
+      'save-book',
+      body: {'google_books_id': book.ids.googleBooksId, 'open_library_id': book.ids.openLibraryId},
+    );
+    final ids = res.data as Map;
     return book.stored(id: ids['book_id'] as String, editionId: ids['edition_id'] as String);
   });
 

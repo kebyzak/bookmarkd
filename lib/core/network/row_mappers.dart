@@ -22,7 +22,9 @@ Book bookFromRows(Map<String, dynamic> work, Map<String, dynamic>? edition) => B
   language: edition?['language'] as String?,
 );
 
-const userBookSelect = '*, book:books(*), edition:book_editions(*)';
+// Constraint names pick the FK: user_books also has a composite (edition_id, book_id) FK,
+// which makes a bare book_editions embed ambiguous (PostgREST PGRST201).
+const userBookSelect = '*, book:books!user_books_book_id_fkey(*), edition:book_editions!user_books_edition_id_fkey(*)';
 
 LibraryEntry entryFromRow(Map<String, dynamic> row) => LibraryEntry(
   id: row['id'] as String,

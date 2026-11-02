@@ -89,20 +89,27 @@ class _ProgressEditorState extends State<_ProgressEditor> {
     final cubit = context.read<LibraryCubit>();
     final update = _byPage ? ProgressUpdate.page(_page, pageCount: _pages!) : ProgressUpdate.percent(_percent);
     setState(() => _saving = true);
+    final LibraryEntry saved;
     try {
-      final saved = await cubit.logProgress(widget.entry, update);
-      HapticFeedback.mediumImpact();
-      if (!mounted) return;
-      setState(() => _history = _loadHistory());
-      if (update.isComplete && saved.status != ReadingStatus.finished) {
-        await _offerFinish(saved);
-      } else {
-        showMessage(context, 'Progress saved · ${update.percent}%');
-      }
+      saved = await cubit.logProgress(widget.entry, update);
     } catch (e) {
-      if (mounted) showMessage(context, AppFailure.from(e).message);
-    } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) {
+        setState(() => _saving = false);
+        showMessage(context, AppFailure.from(e).message);
+      }
+      return;
+    }
+    HapticFeedback.mediumImpact();
+    if (!mounted) return;
+    // The save is done: stop the spinner before asking anything else.
+    setState(() {
+      _saving = false;
+      _history = _loadHistory();
+    });
+    if (update.isComplete && saved.status != ReadingStatus.finished) {
+      await _offerFinish(saved);
+    } else {
+      showMessage(context, 'Progress saved · ${update.percent}%');
     }
   }
 
@@ -241,7 +248,9 @@ class _ProgressEditorState extends State<_ProgressEditor> {
             if (snap.hasError) {
               return ErrorState(
                 message: AppFailure.from(snap.error!).message,
-                onRetry: () => setState(() => _history = _loadHistory()),
+                onRetry: () => setState(() {
+                  _history = _loadHistory();
+                }),
               );
             }
             final sessions = snap.data!;

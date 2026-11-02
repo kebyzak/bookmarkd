@@ -14,9 +14,6 @@ class SupabaseProfileRepository implements ProfileRepository, SocialRepository {
   String get _me => _client.auth.currentUser!.id;
 
   @override
-  bool get canUploadAvatars => true;
-
-  @override
   Future<Profile> getProfile(String userId) => guardSupabase(() async {
     final row = await _client.from('profiles').select().eq('id', userId).single();
     return Profile.fromJson(row);
@@ -41,11 +38,13 @@ class SupabaseProfileRepository implements ProfileRepository, SocialRepository {
 
   @override
   Future<String> uploadAvatar(String userId, Uint8List bytes, {required String extension}) => guardSupabase(() async {
-    final path = '$userId/avatar-${DateTime.now().millisecondsSinceEpoch}.$extension';
+    // One file per user, overwritten on change, so old photos don't pile up.
+    final path = '$userId/avatar';
     await _client.storage
         .from('avatars')
         .uploadBinary(path, bytes, fileOptions: FileOptions(upsert: true, contentType: 'image/$extension'));
-    return _client.storage.from('avatars').getPublicUrl(path);
+    // Same URL every time: the version query makes CDN and image caches fetch the new photo.
+    return '${_client.storage.from('avatars').getPublicUrl(path)}?v=${DateTime.now().millisecondsSinceEpoch}';
   });
 
   @override

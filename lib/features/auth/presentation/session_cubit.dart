@@ -22,13 +22,16 @@ class SignedOut extends SessionState {
 }
 
 class SignedIn extends SessionState {
-  const SignedIn(this.profile);
+  const SignedIn(this.profile, {this.recoveringPassword = false});
   final Profile profile;
+
+  /// Opened a password-reset link: must choose a new password before anything else.
+  final bool recoveringPassword;
 
   bool get needsOnboarding => !profile.onboarded;
 
   @override
-  List<Object?> get props => [profile];
+  List<Object?> get props => [profile, recoveringPassword];
 }
 
 /// Signed in, but the profile could not be loaded.
@@ -45,11 +48,19 @@ class SessionFailure extends SessionState {
 class SessionCubit extends Cubit<SessionState> {
   SessionCubit(this._auth, this._profiles) : super(const SessionUnknown()) {
     _sub = _auth.userIdChanges().listen(_onUser);
+    _recoverySub = _auth.passwordRecoveries().listen((_) {
+      _recovering = true;
+      if (state case SignedIn(:final profile)) emit(SignedIn(profile, recoveringPassword: true));
+    });
   }
 
   final AuthRepository _auth;
   final ProfileRepository _profiles;
   late final StreamSubscription<String?> _sub;
+  late final StreamSubscription<void> _recoverySub;
+
+  /// The recovery event can arrive before the profile has loaded.
+  bool _recovering = false;
 
   Profile? get profile => switch (state) {
     SignedIn(:final profile) => profile,
@@ -59,8 +70,12 @@ class SessionCubit extends Cubit<SessionState> {
   Future<void> _onUser(String? userId) async {
     if (userId == null) return emit(const SignedOut());
     try {
-      emit(SignedIn(await _profiles.getProfile(userId)));
+      final profile = await _profiles.getProfile(userId);
+      // Signed out (or switched user) while loading: this result is stale.
+      if (isClosed || _auth.currentUserId != userId) return;
+      emit(SignedIn(profile, recoveringPassword: _recovering));
     } catch (e) {
+      if (isClosed || _auth.currentUserId != userId) return;
       emit(SessionFailure(userId, AppFailure.from(e).message));
     }
   }
@@ -69,13 +84,23 @@ class SessionCubit extends Cubit<SessionState> {
     if (state case SessionFailure(:final userId)) await _onUser(userId);
   }
 
-  void profileUpdated(Profile profile) => emit(SignedIn(profile));
+  void profileUpdated(Profile profile) => emit(SignedIn(profile, recoveringPassword: _recovering));
 
-  Future<void> signOut() => _auth.signOut();
+  Future<void> updatePassword(String password) async {
+    await _auth.updatePassword(password);
+    _recovering = false;
+    if (state case SignedIn(:final profile)) emit(SignedIn(profile));
+  }
+
+  Future<void> signOut() {
+    _recovering = false;
+    return _auth.signOut();
+  }
 
   @override
   Future<void> close() {
     _sub.cancel();
+    _recoverySub.cancel();
     return super.close();
   }
 }

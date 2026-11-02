@@ -43,6 +43,7 @@ GoRouter createRouter(SessionCubit session) {
       GoRoute(path: '/login', builder: (_, _) => const LoginPage()),
       GoRoute(path: '/register', builder: (_, _) => const RegisterPage()),
       GoRoute(path: '/forgot-password', builder: (_, _) => const ForgotPasswordPage()),
+      GoRoute(path: '/reset-password', builder: (_, _) => const ResetPasswordPage()),
       GoRoute(path: '/onboarding', builder: (_, _) => const OnboardingPage()),
       StatefulShellRoute.indexedStack(
         builder: (_, _, shell) => AppShell(shell: shell),

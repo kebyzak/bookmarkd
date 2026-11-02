@@ -95,12 +95,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         children: [
           Center(child: AppAvatar(profile: _profile, size: 96)),
           Center(
-            child: sl<ProfileRepository>().canUploadAvatars
-                ? TextButton(onPressed: _busy ? null : _changePhoto, child: const Text('Change photo'))
-                : Padding(
-                    padding: const EdgeInsets.all(Space.sm),
-                    child: Text('Photo upload needs a live backend.', style: Theme.of(context).textTheme.bodySmall),
-                  ),
+            child: TextButton(onPressed: _busy ? null : _changePhoto, child: const Text('Change photo')),
           ),
           const SizedBox(height: Space.md),
           TextFormField(

@@ -293,7 +293,10 @@ class _ReaderResultsState extends State<_ReaderResults> {
   void _schedule() {
     _timer?.cancel();
     _timer = Timer(SearchCubit.debounce, () {
-      if (mounted) setState(() => _future = sl<ProfileRepository>().searchProfiles(widget.query));
+      if (!mounted) return;
+      setState(() {
+        _future = sl<ProfileRepository>().searchProfiles(widget.query);
+      });
     });
   }
 

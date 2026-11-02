@@ -3,7 +3,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/app_config.dart';
-import '../core/demo/demo_backend.dart';
 import '../core/network/http_client.dart';
 import '../core/repositories.dart';
 import '../core/services/recent_searches_store.dart';
@@ -17,29 +16,11 @@ import '../features/social/data/supabase_activity_repository.dart';
 
 final sl = GetIt.instance;
 
-/// Registers every dependency once, for the configured [AppMode].
-/// Pass [catalog] / [demo] to substitute fakes in tests.
-Future<void> configureDependencies(AppConfig config, {CatalogRepository? catalog, DemoBackend? demo}) async {
-  await sl.reset();
+/// Registers every dependency once. Call after `Supabase.initialize`.
+void configureDependencies(AppConfig config) {
   sl
-    ..registerSingleton<AppConfig>(config)
-    ..registerSingleton<CatalogRepository>(
-      catalog ?? HttpCatalogRepository(createHttpClient(), apiKey: config.googleBooksApiKey),
-    )
+    ..registerSingleton<CatalogRepository>(HttpCatalogRepository(createHttpClient(), apiKey: config.googleBooksApiKey))
     ..registerLazySingleton(() => RecentSearchesStore(SharedPreferencesAsync()));
-
-  if (config.mode == AppMode.demo) {
-    final db = demo ?? DemoBackend();
-    sl
-      ..registerSingleton<AuthRepository>(db)
-      ..registerSingleton<ProfileRepository>(db)
-      ..registerSingleton<SocialRepository>(db)
-      ..registerSingleton<BookRepository>(db)
-      ..registerSingleton<LibraryRepository>(db)
-      ..registerSingleton<ReviewRepository>(db)
-      ..registerSingleton<ActivityRepository>(db);
-    return;
-  }
 
   final client = Supabase.instance.client;
   final profiles = SupabaseProfileRepository(client);
