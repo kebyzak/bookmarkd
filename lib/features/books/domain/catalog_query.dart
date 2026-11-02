@@ -28,17 +28,20 @@ class CatalogQuery {
   bool get isSearchable => text.length >= 2;
 
   String get googleQuery => switch (mode) {
-        SearchMode.any => text,
-        SearchMode.title => 'intitle:$text',
-        SearchMode.author => 'inauthor:$text',
-        SearchMode.isbn => 'isbn:$text',
-      };
+    SearchMode.any => text,
+    SearchMode.title => 'intitle:$text',
+    SearchMode.author => 'inauthor:$text',
+    SearchMode.isbn => 'isbn:$text',
+  };
 
   /// Query parameters for Open Library's `/search.json`.
   Map<String, String> get openLibraryParams => switch (mode) {
-        SearchMode.any => {'q': text},
-        SearchMode.title => {'title': text},
-        SearchMode.author => {'author': text},
-        SearchMode.isbn => {'isbn': text},
-      };
+    SearchMode.any => {'q': text},
+    SearchMode.title => {'title': text},
+    SearchMode.author => {'author': text},
+    SearchMode.isbn => {'isbn': text},
+  };
 }
+
+/// Results per catalog page, shared by the API client and pagination logic.
+const catalogPageSize = 20;

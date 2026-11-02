@@ -43,16 +43,16 @@ class Activity extends Equatable {
   final bool likedByMe;
 
   Activity toggledLike() => Activity(
-        id: id,
-        type: type,
-        actor: actor,
-        book: book,
-        createdAt: createdAt,
-        rating: rating,
-        reviewExcerpt: reviewExcerpt,
-        likedByMe: !likedByMe,
-        likeCount: likeCount + (likedByMe ? -1 : 1),
-      );
+    id: id,
+    type: type,
+    actor: actor,
+    book: book,
+    createdAt: createdAt,
+    rating: rating,
+    reviewExcerpt: reviewExcerpt,
+    likedByMe: !likedByMe,
+    likeCount: likeCount + (likedByMe ? -1 : 1),
+  );
 
   @override
   List<Object?> get props => [id, type, actor, book, createdAt, rating, reviewExcerpt, likeCount, likedByMe];

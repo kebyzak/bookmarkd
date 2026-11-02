@@ -13,7 +13,6 @@ class HttpCatalogRepository implements CatalogRepository {
 
   final Dio _dio;
   final String apiKey;
-  static const pageSize = 20;
 
   @override
   Future<List<Book>> search(CatalogQuery query, {int startIndex = 0}) async {
@@ -50,7 +49,7 @@ class HttpCatalogRepository implements CatalogRepository {
     final json = await _get('https://www.googleapis.com/books/v1/volumes', {
       'q': query.googleQuery,
       'startIndex': '$startIndex',
-      'maxResults': '$pageSize',
+      'maxResults': '$catalogPageSize',
       'printType': 'books',
       if (apiKey.isNotEmpty) 'key': apiKey,
     });
@@ -59,9 +58,7 @@ class HttpCatalogRepository implements CatalogRepository {
   }
 
   Future<Book> _googleVolume(String id) async {
-    final json = await _get('https://www.googleapis.com/books/v1/volumes/$id', {
-      if (apiKey.isNotEmpty) 'key': apiKey,
-    });
+    final json = await _get('https://www.googleapis.com/books/v1/volumes/$id', {if (apiKey.isNotEmpty) 'key': apiKey});
     return parseGoogleVolume(json);
   }
 
@@ -69,8 +66,9 @@ class HttpCatalogRepository implements CatalogRepository {
     final json = await _get('https://openlibrary.org/search.json', {
       ...query.openLibraryParams,
       'offset': '$startIndex',
-      'limit': '$pageSize',
-      'fields': 'key,title,subtitle,author_name,first_publish_year,isbn,number_of_pages_median,'
+      'limit': '$catalogPageSize',
+      'fields':
+          'key,title,subtitle,author_name,first_publish_year,isbn,number_of_pages_median,'
           'cover_i,publisher,subject,language',
     });
     final docs = (json['docs'] as List?) ?? const [];

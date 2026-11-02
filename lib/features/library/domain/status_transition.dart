@@ -8,24 +8,24 @@ LibraryEntry transitionStatus(LibraryEntry entry, ReadingStatus to, {required Da
   final date = DateTime(today.year, today.month, today.day);
   return switch (to) {
     ReadingStatus.wantToRead => entry.copyWith(
-        status: to,
-        startedAt: () => null,
-        finishedAt: () => null,
-        currentPage: () => null,
-        progressPercent: () => null,
-      ),
+      status: to,
+      startedAt: () => null,
+      finishedAt: () => null,
+      currentPage: () => null,
+      progressPercent: () => null,
+    ),
     ReadingStatus.reading => entry.copyWith(
-        status: to,
-        startedAt: () => entry.startedAt ?? date,
-        finishedAt: () => null,
-      ),
+      status: to,
+      startedAt: () => entry.startedAt ?? date,
+      finishedAt: () => null,
+    ),
     ReadingStatus.finished => entry.copyWith(
-        status: to,
-        startedAt: () => entry.startedAt ?? date,
-        finishedAt: () => entry.finishedAt ?? date,
-        currentPage: () => entry.book.pageCount ?? entry.currentPage,
-        progressPercent: () => 100,
-      ),
+      status: to,
+      startedAt: () => entry.startedAt ?? date,
+      finishedAt: () => entry.finishedAt ?? date,
+      currentPage: () => entry.book.pageCount ?? entry.currentPage,
+      progressPercent: () => 100,
+    ),
     ReadingStatus.dnf => entry.copyWith(status: to, finishedAt: () => null),
   };
 }

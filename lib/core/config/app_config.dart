@@ -5,22 +5,27 @@ enum AppMode { live, demo }
 class AppConfig {
   const AppConfig({
     required this.supabaseUrl,
-    required this.supabaseAnonKey,
+    required this.supabaseKey,
     required this.googleBooksApiKey,
     required this.passwordResetRedirect,
   });
 
   factory AppConfig.fromEnvironment() => const AppConfig(
-        supabaseUrl: String.fromEnvironment('SUPABASE_URL'),
-        supabaseAnonKey: String.fromEnvironment('SUPABASE_ANON_KEY'),
-        googleBooksApiKey: String.fromEnvironment('GOOGLE_BOOKS_API_KEY'),
-        passwordResetRedirect: String.fromEnvironment('PASSWORD_RESET_REDIRECT'),
-      );
+    supabaseUrl: String.fromEnvironment('SUPABASE_URL'),
+    supabaseKey: String.fromEnvironment(
+      'SUPABASE_PUBLISHABLE_KEY',
+      defaultValue: String.fromEnvironment('SUPABASE_ANON_KEY'),
+    ),
+    googleBooksApiKey: String.fromEnvironment('GOOGLE_BOOKS_API_KEY'),
+    passwordResetRedirect: String.fromEnvironment('PASSWORD_RESET_REDIRECT'),
+  );
 
   final String supabaseUrl;
-  final String supabaseAnonKey;
+
+  /// Publishable (or legacy anon) key. Public by design; RLS protects data.
+  final String supabaseKey;
   final String googleBooksApiKey;
   final String passwordResetRedirect;
 
-  AppMode get mode => supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty ? AppMode.live : AppMode.demo;
+  AppMode get mode => supabaseUrl.isNotEmpty && supabaseKey.isNotEmpty ? AppMode.live : AppMode.demo;
 }

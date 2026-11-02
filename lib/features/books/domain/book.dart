@@ -2,12 +2,7 @@ import 'package:equatable/equatable.dart';
 
 /// External identifiers of a specific edition.
 class ExternalIds extends Equatable {
-  const ExternalIds({
-    this.googleBooksId,
-    this.openLibraryId,
-    this.isbn10,
-    this.isbn13,
-  });
+  const ExternalIds({this.googleBooksId, this.openLibraryId, this.isbn10, this.isbn13});
 
   final String? googleBooksId;
   final String? openLibraryId;
@@ -24,18 +19,18 @@ class ExternalIds extends Equatable {
   }
 
   Map<String, dynamic> toJson() => {
-        'google_books_id': googleBooksId,
-        'open_library_id': openLibraryId,
-        'isbn_10': isbn10,
-        'isbn_13': isbn13,
-      };
+    'google_books_id': googleBooksId,
+    'open_library_id': openLibraryId,
+    'isbn_10': isbn10,
+    'isbn_13': isbn13,
+  };
 
   factory ExternalIds.fromJson(Map<String, dynamic> json) => ExternalIds(
-        googleBooksId: json['google_books_id'] as String?,
-        openLibraryId: json['open_library_id'] as String?,
-        isbn10: json['isbn_10'] as String?,
-        isbn13: json['isbn_13'] as String?,
-      );
+    googleBooksId: json['google_books_id'] as String?,
+    openLibraryId: json['open_library_id'] as String?,
+    isbn10: json['isbn_10'] as String?,
+    isbn13: json['isbn_13'] as String?,
+  );
 
   @override
   List<Object?> get props => [googleBooksId, openLibraryId, isbn10, isbn13];
@@ -93,60 +88,59 @@ class Book extends Equatable {
   }
 
   Book stored({required String id, required String editionId}) => Book(
-        id: id,
-        editionId: editionId,
-        ids: ids,
-        title: title,
-        subtitle: subtitle,
-        authors: authors,
-        description: description,
-        coverUrl: coverUrl,
-        publisher: publisher,
-        publishedDate: publishedDate,
-        pageCount: pageCount,
-        categories: categories,
-        language: language,
-      );
+    id: id,
+    editionId: editionId,
+    ids: ids,
+    title: title,
+    subtitle: subtitle,
+    authors: authors,
+    description: description,
+    coverUrl: coverUrl,
+    publisher: publisher,
+    publishedDate: publishedDate,
+    pageCount: pageCount,
+    categories: categories,
+    language: language,
+  );
 
   /// Shape accepted by the `upsert_catalog_book` RPC and the local cache.
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'edition_id': editionId,
-        ...ids.toJson(),
-        'title': title,
-        'subtitle': subtitle,
-        'authors': authors,
-        'description': description,
-        'cover_url': coverUrl,
-        'publisher': publisher,
-        'published_date': publishedDate,
-        'page_count': pageCount,
-        'categories': categories,
-        'language': language,
-      };
+    'id': id,
+    'edition_id': editionId,
+    ...ids.toJson(),
+    'title': title,
+    'subtitle': subtitle,
+    'authors': authors,
+    'description': description,
+    'cover_url': coverUrl,
+    'publisher': publisher,
+    'published_date': publishedDate,
+    'page_count': pageCount,
+    'categories': categories,
+    'language': language,
+  };
 
   factory Book.fromJson(Map<String, dynamic> json) => Book(
-        id: json['id'] as String?,
-        editionId: json['edition_id'] as String?,
-        ids: ExternalIds.fromJson(json),
-        title: json['title'] as String,
-        subtitle: json['subtitle'] as String?,
-        authors: _strings(json['authors']),
-        description: json['description'] as String?,
-        coverUrl: json['cover_url'] as String?,
-        publisher: json['publisher'] as String?,
-        publishedDate: json['published_date'] as String?,
-        pageCount: positiveOrNull(json['page_count']),
-        categories: _strings(json['categories']),
-        language: json['language'] as String?,
-      );
+    id: json['id'] as String?,
+    editionId: json['edition_id'] as String?,
+    ids: ExternalIds.fromJson(json),
+    title: json['title'] as String,
+    subtitle: json['subtitle'] as String?,
+    authors: _strings(json['authors']),
+    description: json['description'] as String?,
+    coverUrl: json['cover_url'] as String?,
+    publisher: json['publisher'] as String?,
+    publishedDate: json['published_date'] as String?,
+    pageCount: positiveOrNull(json['page_count']),
+    categories: _strings(json['categories']),
+    language: json['language'] as String?,
+  );
 
   @override
   List<Object?> get props => [id, editionId, ids, title, authors, pageCount, coverUrl];
 }
 
-List<String> _strings(Object? value) =>
-    value is List ? value.whereType<String>().toList(growable: false) : const [];
+List<String> _strings(Object? value) => value is List ? value.whereType<String>().toList(growable: false) : const [];
 
 int? positiveOrNull(Object? value) {
   final n = value is num ? value.toInt() : int.tryParse('$value');

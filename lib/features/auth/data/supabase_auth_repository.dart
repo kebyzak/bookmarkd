@@ -26,15 +26,17 @@ class SupabaseAuthRepository implements AuthRepository {
 
   @override
   Future<SignUpResult> signUp({required String email, required String password}) => guardSupabase(() async {
-        final res = await _auth.signUp(email: email.trim(), password: password);
-        return res.session == null ? SignUpResult.confirmEmail : SignUpResult.signedIn;
-      });
+    final res = await _auth.signUp(email: email.trim(), password: password);
+    return res.session == null ? SignUpResult.confirmEmail : SignUpResult.signedIn;
+  });
 
   @override
-  Future<void> sendPasswordReset(String email) => guardSupabase(() => _auth.resetPasswordForEmail(
-        email.trim(),
-        redirectTo: passwordResetRedirect.isEmpty ? null : passwordResetRedirect,
-      ));
+  Future<void> sendPasswordReset(String email) => guardSupabase(
+    () => _auth.resetPasswordForEmail(
+      email.trim(),
+      redirectTo: passwordResetRedirect.isEmpty ? null : passwordResetRedirect,
+    ),
+  );
 
   @override
   Future<void> signOut() => guardSupabase(() => _auth.signOut());

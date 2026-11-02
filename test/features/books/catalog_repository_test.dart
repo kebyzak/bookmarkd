@@ -17,9 +17,13 @@ class FakeAdapter implements HttpClientAdapter {
   Future<ResponseBody> fetch(RequestOptions options, Stream<Uint8List>? body, Future<void>? cancel) async {
     requested.add(options.uri);
     final (status, json) = responses[options.uri.host]!;
-    return ResponseBody.fromString(jsonEncode(json), status, headers: {
-      Headers.contentTypeHeader: [Headers.jsonContentType],
-    });
+    return ResponseBody.fromString(
+      jsonEncode(json),
+      status,
+      headers: {
+        Headers.contentTypeHeader: [Headers.jsonContentType],
+      },
+    );
   }
 
   @override
@@ -32,14 +36,21 @@ const googleOk = {
   'items': [
     {
       'id': 'g1',
-      'volumeInfo': {'title': 'Dune', 'authors': ['Frank Herbert']},
+      'volumeInfo': {
+        'title': 'Dune',
+        'authors': ['Frank Herbert'],
+      },
     },
   ],
 };
 
 const openLibraryOk = {
   'docs': [
-    {'key': '/works/OL1W', 'title': 'Dune', 'author_name': ['Frank Herbert']},
+    {
+      'key': '/works/OL1W',
+      'title': 'Dune',
+      'author_name': ['Frank Herbert'],
+    },
   ],
 };
 
@@ -51,20 +62,14 @@ void main() {
   });
 
   test('falls back to Open Library when Google is rate limited', () async {
-    final adapter = FakeAdapter({
-      'www.googleapis.com': (429, {}),
-      'openlibrary.org': (200, openLibraryOk),
-    });
+    final adapter = FakeAdapter({'www.googleapis.com': (429, {}), 'openlibrary.org': (200, openLibraryOk)});
     final books = await repoWith(adapter).search(CatalogQuery.parse('dune', mode: SearchMode.title));
     expect(books.single.key, 'ol:OL1W');
     expect(adapter.requested.last.queryParameters['title'], 'dune');
   });
 
   test('reports the original failure when both catalogs fail', () async {
-    final adapter = FakeAdapter({
-      'www.googleapis.com': (429, {}),
-      'openlibrary.org': (503, {}),
-    });
+    final adapter = FakeAdapter({'www.googleapis.com': (429, {}), 'openlibrary.org': (503, {})});
     expect(
       repoWith(adapter).search(CatalogQuery.parse('dune')),
       throwsA(isA<AppFailure>().having((f) => f.kind, 'kind', FailureKind.rateLimited)),

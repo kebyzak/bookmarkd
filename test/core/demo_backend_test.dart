@@ -9,7 +9,12 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   late DemoBackend db;
-  const catalogBook = Book(ids: ExternalIds(googleBooksId: 'g-new'), title: 'New Book', authors: ['A'], pageCount: 200);
+  const catalogBook = Book(
+    ids: ExternalIds(googleBooksId: 'g-new'),
+    title: 'New Book',
+    authors: ['A'],
+    pageCount: 200,
+  );
 
   setUp(() async {
     db = DemoBackend(latency: Duration.zero, clock: () => DateTime(2026, 11, 2));

@@ -43,38 +43,37 @@ class Profile extends Equatable {
     int? Function()? readingGoal,
     bool? isPrivate,
     bool? onboarded,
-  }) =>
-      Profile(
-        id: id,
-        username: username ?? this.username,
-        displayName: displayName != null ? displayName() : this.displayName,
-        bio: bio != null ? bio() : this.bio,
-        avatarUrl: avatarUrl != null ? avatarUrl() : this.avatarUrl,
-        readingGoal: readingGoal != null ? readingGoal() : this.readingGoal,
-        isPrivate: isPrivate ?? this.isPrivate,
-        onboarded: onboarded ?? this.onboarded,
-      );
+  }) => Profile(
+    id: id,
+    username: username ?? this.username,
+    displayName: displayName != null ? displayName() : this.displayName,
+    bio: bio != null ? bio() : this.bio,
+    avatarUrl: avatarUrl != null ? avatarUrl() : this.avatarUrl,
+    readingGoal: readingGoal != null ? readingGoal() : this.readingGoal,
+    isPrivate: isPrivate ?? this.isPrivate,
+    onboarded: onboarded ?? this.onboarded,
+  );
 
   factory Profile.fromJson(Map<String, dynamic> json) => Profile(
-        id: json['id'] as String,
-        username: json['username'] as String?,
-        displayName: json['display_name'] as String?,
-        bio: json['bio'] as String?,
-        avatarUrl: json['avatar_url'] as String?,
-        readingGoal: json['reading_goal'] as int?,
-        isPrivate: json['is_private'] as bool? ?? false,
-        onboarded: json['onboarded'] as bool? ?? false,
-      );
+    id: json['id'] as String,
+    username: json['username'] as String?,
+    displayName: json['display_name'] as String?,
+    bio: json['bio'] as String?,
+    avatarUrl: json['avatar_url'] as String?,
+    readingGoal: json['reading_goal'] as int?,
+    isPrivate: json['is_private'] as bool? ?? false,
+    onboarded: json['onboarded'] as bool? ?? false,
+  );
 
   Map<String, dynamic> toUpdateJson() => {
-        'username': username,
-        'display_name': displayName,
-        'bio': bio,
-        'avatar_url': avatarUrl,
-        'reading_goal': readingGoal,
-        'is_private': isPrivate,
-        'onboarded': onboarded,
-      };
+    'username': username,
+    'display_name': displayName,
+    'bio': bio,
+    'avatar_url': avatarUrl,
+    'reading_goal': readingGoal,
+    'is_private': isPrivate,
+    'onboarded': onboarded,
+  };
 
   @override
   List<Object?> get props => [id, username, displayName, bio, avatarUrl, readingGoal, isPrivate, onboarded];

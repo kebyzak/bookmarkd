@@ -23,10 +23,10 @@ class LibraryQuery extends Equatable {
   final LibrarySort sort;
 
   LibraryQuery copyWith({ReadingStatus? Function()? status, String? search, LibrarySort? sort}) => LibraryQuery(
-        status: status != null ? status() : this.status,
-        search: search ?? this.search,
-        sort: sort ?? this.sort,
-      );
+    status: status != null ? status() : this.status,
+    search: search ?? this.search,
+    sort: sort ?? this.sort,
+  );
 
   List<LibraryEntry> apply(Iterable<LibraryEntry> entries) {
     final needle = search.trim().toLowerCase();
@@ -40,11 +40,11 @@ class LibraryQuery extends Equatable {
   }
 
   int _comparator(LibraryEntry a, LibraryEntry b) => switch (sort) {
-        LibrarySort.dateAdded => b.addedAt.compareTo(a.addedAt),
-        LibrarySort.rating => _descNullsLast(a.rating?.halfStars, b.rating?.halfStars),
-        LibrarySort.title => a.book.title.toLowerCase().compareTo(b.book.title.toLowerCase()),
-        LibrarySort.publicationYear => _descNullsLast(a.book.publishedYear, b.book.publishedYear),
-      };
+    LibrarySort.dateAdded => b.addedAt.compareTo(a.addedAt),
+    LibrarySort.rating => _descNullsLast(a.rating?.halfStars, b.rating?.halfStars),
+    LibrarySort.title => a.book.title.toLowerCase().compareTo(b.book.title.toLowerCase()),
+    LibrarySort.publicationYear => _descNullsLast(a.book.publishedYear, b.book.publishedYear),
+  };
 
   @override
   List<Object?> get props => [status, search, sort];

@@ -17,11 +17,7 @@ Book parseGoogleVolume(Map<String, dynamic> json) {
   final rawCover = (images['thumbnail'] ?? images['smallThumbnail']) as String?;
 
   return Book(
-    ids: ExternalIds(
-      googleBooksId: json['id'] as String?,
-      isbn10: isbn('ISBN_10'),
-      isbn13: isbn('ISBN_13'),
-    ),
+    ids: ExternalIds(googleBooksId: json['id'] as String?, isbn10: isbn('ISBN_10'), isbn13: isbn('ISBN_13')),
     title: _clean(info['title']) ?? 'Untitled',
     subtitle: _clean(info['subtitle']),
     authors: _stringList(info['authors']),
@@ -78,9 +74,7 @@ List<Book> dedupeBooks(Iterable<Book> books) {
   return result;
 }
 
-String _googleCover(String url) => url
-    .replaceFirst('http://', 'https://')
-    .replaceAll('&edge=curl', '');
+String _googleCover(String url) => url.replaceFirst('http://', 'https://').replaceAll('&edge=curl', '');
 
 String _normalizeCategory(String raw) {
   final parts = raw.split('/').map((p) => p.trim()).where((p) => p.isNotEmpty && p != 'General');
@@ -93,8 +87,7 @@ String? _clean(Object? value) {
   return trimmed.isEmpty ? null : trimmed;
 }
 
-String? _stripHtml(String? value) =>
-    value?.replaceAll(RegExp(r'<br\s*/?>'), '\n').replaceAll(RegExp(r'<[^>]+>'), '');
+String? _stripHtml(String? value) => value?.replaceAll(RegExp(r'<br\s*/?>'), '\n').replaceAll(RegExp(r'<[^>]+>'), '');
 
 List<String> _stringList(Object? value) =>
     value is List ? value.whereType<String>().map((s) => s.trim()).where((s) => s.isNotEmpty).toList() : const [];

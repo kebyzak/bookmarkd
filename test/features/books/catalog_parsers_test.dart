@@ -96,18 +96,13 @@ void main() {
 
   group('dedupeBooks', () {
     Book book(String gid, {String? isbn13}) => Book(
-          ids: ExternalIds(googleBooksId: gid, isbn13: isbn13),
-          title: 'T$gid',
-          authors: const [],
-        );
+      ids: ExternalIds(googleBooksId: gid, isbn13: isbn13),
+      title: 'T$gid',
+      authors: const [],
+    );
 
     test('drops repeated external ids and repeated ISBN-13s, keeping the first', () {
-      final result = dedupeBooks([
-        book('a', isbn13: '1'),
-        book('a'),
-        book('b', isbn13: '1'),
-        book('c', isbn13: '2'),
-      ]);
+      final result = dedupeBooks([book('a', isbn13: '1'), book('a'), book('b', isbn13: '1'), book('c', isbn13: '2')]);
       expect(result.map((b) => b.ids.googleBooksId), ['a', 'c']);
     });
   });

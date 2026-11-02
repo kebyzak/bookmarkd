@@ -17,37 +17,42 @@ class SupabaseReviewRepository implements ReviewRepository {
 
   @override
   Future<List<Review>> forBook(String bookId, {int limit = 20, int offset = 0}) => guardSupabase(() async {
-        final rows = await _client
-            .from('reviews')
-            .select(_select)
-            .eq('book_id', bookId)
-            .order('created_at', ascending: false)
-            .range(offset, offset + limit - 1);
-        return _withRatings(rows);
-      });
+    final rows = await _client
+        .from('reviews')
+        .select(_select)
+        .eq('book_id', bookId)
+        .order('created_at', ascending: false)
+        .range(offset, offset + limit - 1);
+    return _withRatings(rows);
+  });
 
   @override
   Future<List<Review>> byUser(String userId) => guardSupabase(() async {
-        final rows =
-            await _client.from('reviews').select(_select).eq('user_id', userId).order('created_at', ascending: false);
-        return _withRatings(rows);
-      });
+    final rows = await _client
+        .from('reviews')
+        .select(_select)
+        .eq('user_id', userId)
+        .order('created_at', ascending: false);
+    return _withRatings(rows);
+  });
 
   @override
   Future<Review?> mine(String bookId) => guardSupabase(() async {
-        final row = await _client.from('reviews').select(_select).eq('book_id', bookId).eq('user_id', _me).maybeSingle();
-        return row == null ? null : (await _withRatings([row])).first;
-      });
+    final row = await _client.from('reviews').select(_select).eq('book_id', bookId).eq('user_id', _me).maybeSingle();
+    return row == null ? null : (await _withRatings([row])).first;
+  });
 
   @override
   Future<Review> upsert({required String bookId, required String body, required bool containsSpoilers}) =>
       guardSupabase(() async {
         final row = await _client
             .from('reviews')
-            .upsert(
-              {'user_id': _me, 'book_id': bookId, 'body': body.trim(), 'contains_spoilers': containsSpoilers},
-              onConflict: 'user_id,book_id',
-            )
+            .upsert({
+              'user_id': _me,
+              'book_id': bookId,
+              'body': body.trim(),
+              'contains_spoilers': containsSpoilers,
+            }, onConflict: 'user_id,book_id')
             .select(_select)
             .single();
         return (await _withRatings([row])).first;

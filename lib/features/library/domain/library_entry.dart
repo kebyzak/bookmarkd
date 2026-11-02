@@ -52,22 +52,31 @@ class LibraryEntry extends Equatable {
     bool? isFavorite,
     DateTime? Function()? startedAt,
     DateTime? Function()? finishedAt,
-  }) =>
-      LibraryEntry(
-        id: id,
-        userId: userId,
-        book: book,
-        addedAt: addedAt,
-        status: status ?? this.status,
-        currentPage: currentPage != null ? currentPage() : this.currentPage,
-        progressPercent: progressPercent != null ? progressPercent() : this.progressPercent,
-        rating: rating != null ? rating() : this.rating,
-        isFavorite: isFavorite ?? this.isFavorite,
-        startedAt: startedAt != null ? startedAt() : this.startedAt,
-        finishedAt: finishedAt != null ? finishedAt() : this.finishedAt,
-      );
+  }) => LibraryEntry(
+    id: id,
+    userId: userId,
+    book: book,
+    addedAt: addedAt,
+    status: status ?? this.status,
+    currentPage: currentPage != null ? currentPage() : this.currentPage,
+    progressPercent: progressPercent != null ? progressPercent() : this.progressPercent,
+    rating: rating != null ? rating() : this.rating,
+    isFavorite: isFavorite ?? this.isFavorite,
+    startedAt: startedAt != null ? startedAt() : this.startedAt,
+    finishedAt: finishedAt != null ? finishedAt() : this.finishedAt,
+  );
 
   @override
-  List<Object?> get props =>
-      [id, book, status, currentPage, progressPercent, rating, isFavorite, startedAt, finishedAt, addedAt];
+  List<Object?> get props => [
+    id,
+    book,
+    status,
+    currentPage,
+    progressPercent,
+    rating,
+    isFavorite,
+    startedAt,
+    finishedAt,
+    addedAt,
+  ];
 }

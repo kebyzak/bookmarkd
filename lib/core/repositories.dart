@@ -51,6 +51,9 @@ abstract interface class CatalogRepository {
 abstract interface class BookRepository {
   Future<Book> getStoredBook(String bookId);
 
+  /// The stored book matching any of [ids], if someone already added it.
+  Future<Book?> findStored(ExternalIds ids);
+
   /// Saves catalog metadata (deduplicated server-side). Idempotent.
   Future<Book> save(Book book);
   Future<BookStats> stats(String bookId);

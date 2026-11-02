@@ -30,7 +30,7 @@ class DemoBackend
         ReviewRepository,
         ActivityRepository {
   DemoBackend({DateTime Function()? clock, this.latency = const Duration(milliseconds: 250), bool seed = true})
-      : _clock = clock ?? DateTime.now {
+    : _clock = clock ?? DateTime.now {
     if (seed) seedDemoData(this);
   }
 
@@ -74,15 +74,15 @@ class DemoBackend
   /// Any email with a 6+ character password signs in as the local demo reader.
   @override
   Future<void> signIn({required String email, required String password}) => _run(() {
-        if (password.length < 6) throw const AppFailure(FailureKind.unauthorized, 'Invalid email or password.');
-        final id = 'me-${email.trim().toLowerCase()}';
-        profiles.putIfAbsent(id, () => Profile(id: id));
-        for (final friend in demoFriendIds) {
-          follows.add((id, friend));
-        }
-        _currentUserId = id;
-        _user.add(id);
-      });
+    if (password.length < 6) throw const AppFailure(FailureKind.unauthorized, 'Invalid email or password.');
+    final id = 'me-${email.trim().toLowerCase()}';
+    profiles.putIfAbsent(id, () => Profile(id: id));
+    for (final friend in demoFriendIds) {
+      follows.add((id, friend));
+    }
+    _currentUserId = id;
+    _user.add(id);
+  });
 
   @override
   Future<SignUpResult> signUp({required String email, required String password}) async {
@@ -95,9 +95,9 @@ class DemoBackend
 
   @override
   Future<void> signOut() => _run(() {
-        _currentUserId = null;
-        _user.add(null);
-      });
+    _currentUserId = null;
+    _user.add(null);
+  });
 
   // ───────── profiles & social ─────────
 
@@ -107,12 +107,12 @@ class DemoBackend
 
   @override
   Future<Profile> updateProfile(Profile profile) => _run(() {
-        if (profile.id != _me) throw const AppFailure.unauthorized();
-        if (profile.username != null && !_usernameFree(profile.username!, profile.id)) {
-          throw const AppFailure.conflict('That username is taken.');
-        }
-        return profiles[profile.id] = profile;
-      });
+    if (profile.id != _me) throw const AppFailure.unauthorized();
+    if (profile.username != null && !_usernameFree(profile.username!, profile.id)) {
+      throw const AppFailure.conflict('That username is taken.');
+    }
+    return profiles[profile.id] = profile;
+  });
 
   bool _usernameFree(String username, String exceptUserId) =>
       !profiles.values.any((p) => p.username == username && p.id != exceptUserId);
@@ -128,27 +128,29 @@ class DemoBackend
 
   @override
   Future<List<Profile>> searchProfiles(String query) => _run(() {
-        final q = query.trim().toLowerCase();
-        if (q.isEmpty) return const <Profile>[];
-        return profiles.values
-            .where((p) => p.onboarded && ((p.username ?? '').contains(q) || p.name.toLowerCase().contains(q)))
-            .toList();
-      });
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return const <Profile>[];
+    return profiles.values
+        .where((p) => p.onboarded && ((p.username ?? '').contains(q) || p.name.toLowerCase().contains(q)))
+        .toList();
+  });
 
   @override
-  Future<FollowCounts> followCounts(String userId) => _run(() => FollowCounts(
-        followers: follows.where((f) => f.$2 == userId).length,
-        following: follows.where((f) => f.$1 == userId).length,
-      ));
+  Future<FollowCounts> followCounts(String userId) => _run(
+    () => FollowCounts(
+      followers: follows.where((f) => f.$2 == userId).length,
+      following: follows.where((f) => f.$1 == userId).length,
+    ),
+  );
 
   @override
   Future<bool> isFollowing(String otherUserId) => _run(() => follows.contains((_me, otherUserId)));
 
   @override
   Future<void> follow(String otherUserId) => _run(() {
-        if (otherUserId == _me) throw const AppFailure.validation("You can't follow yourself.");
-        follows.add((_me, otherUserId));
-      });
+    if (otherUserId == _me) throw const AppFailure.validation("You can't follow yourself.");
+    follows.add((_me, otherUserId));
+  });
 
   @override
   Future<void> unfollow(String otherUserId) => _run(() => follows.remove((_me, otherUserId)));
@@ -160,55 +162,64 @@ class DemoBackend
       _run(() => books[bookId] ?? (throw const AppFailure.notFound('Book not found.')));
 
   @override
+  Future<Book?> findStored(ExternalIds ids) => _run(() => _match(ids));
+
+  @override
   Future<Book> save(Book book) => _run(() => saveSync(book));
 
   /// Same matching order as `upsert_catalog_book`.
   Book saveSync(Book book) {
     if (book.isStored) return book;
-    bool same(String? a, String? b) => a != null && a == b;
-    for (final b in books.values) {
-      if (same(b.ids.googleBooksId, book.ids.googleBooksId) ||
-          same(b.ids.openLibraryId, book.ids.openLibraryId) ||
-          same(b.ids.isbn13, book.ids.isbn13) ||
-          same(b.ids.isbn10, book.ids.isbn10)) {
-        return b;
-      }
-    }
+    final existing = _match(book.ids);
+    if (existing != null) return existing;
     final id = nextId('book');
     return books[id] = book.stored(id: id, editionId: 'ed-$id');
   }
 
+  Book? _match(ExternalIds ids) {
+    bool same(String? a, String? b) => a != null && a == b;
+    return books.values
+        .where(
+          (b) =>
+              same(b.ids.googleBooksId, ids.googleBooksId) ||
+              same(b.ids.openLibraryId, ids.openLibraryId) ||
+              same(b.ids.isbn13, ids.isbn13) ||
+              same(b.ids.isbn10, ids.isbn10),
+        )
+        .firstOrNull;
+  }
+
   @override
   Future<BookStats> stats(String bookId) => _run(() {
-        final forBook = entries.values.where((e) => e.book.id == bookId && _visible(e.userId));
-        final rated = forBook.map((e) => e.rating).nonNulls.toList();
-        return BookStats(
-          readerCount: forBook.length,
-          ratingCount: rated.length,
-          averageRating: rated.isEmpty ? null : rated.fold<double>(0, (s, r) => s + r.stars) / rated.length,
-        );
-      });
+    final forBook = entries.values.where((e) => e.book.id == bookId && _visible(e.userId));
+    final rated = forBook.map((e) => e.rating).nonNulls.toList();
+    return BookStats(
+      readerCount: forBook.length,
+      ratingCount: rated.length,
+      averageRating: rated.isEmpty ? null : rated.fold<double>(0, (s, r) => s + r.stars) / rated.length,
+    );
+  });
 
   @override
   Future<List<Book>> popular({String? category, int limit = 20}) => _run(() {
-        final counts = <String, int>{};
-        for (final e in entries.values) {
-          if (category == null || e.book.categories.contains(category)) {
-            counts.update(e.book.id!, (c) => c + 1, ifAbsent: () => 1);
-          }
-        }
-        return _ranked(counts, limit);
-      });
+    final counts = <String, int>{};
+    for (final e in entries.values) {
+      if (category == null || e.book.categories.contains(category)) {
+        counts.update(e.book.id!, (c) => c + 1, ifAbsent: () => 1);
+      }
+    }
+    return _ranked(counts, limit);
+  });
 
   @override
   Future<List<Book>> trending({int limit = 20}) => _run(() {
-        final since = now.subtract(const Duration(days: 7));
-        final counts = <String, int>{};
-        for (final a in activities.where((a) => a.createdAt.isAfter(since))) {
-          counts.update(a.book.id!, (c) => c + 1, ifAbsent: () => 1);
-        }
-        return _ranked(counts, limit);
-      });
+    final since = now.subtract(const Duration(days: 7));
+    final counts = <String, int>{};
+    for (final a in activities.where((a) => a.createdAt.isAfter(since))) {
+      counts.update(a.book.id!, (c) => c + 1, ifAbsent: () => 1);
+    }
+    return _ranked(counts, limit);
+  });
 
   List<Book> _ranked(Map<String, int> counts, int limit) {
     final ids = counts.keys.toList()..sort((a, b) => counts[b]!.compareTo(counts[a]!));
@@ -221,10 +232,9 @@ class DemoBackend
 
   @override
   Future<List<LibraryEntry>> getLibrary(String userId) => _run(() {
-        if (!_visible(userId)) return const <LibraryEntry>[];
-        return entries.values.where((e) => e.userId == userId).toList()
-          ..sort((a, b) => b.addedAt.compareTo(a.addedAt));
-      });
+    if (!_visible(userId)) return const <LibraryEntry>[];
+    return entries.values.where((e) => e.userId == userId).toList()..sort((a, b) => b.addedAt.compareTo(a.addedAt));
+  });
 
   @override
   Future<LibraryEntry> add(Book storedBook, ReadingStatus status) => _run(() => addSync(_me, storedBook, status));
@@ -261,33 +271,37 @@ class DemoBackend
 
   @override
   Future<void> remove(String entryId) => _run(() {
-        final e = entries[entryId];
-        if (e == null || e.userId != _me) throw const AppFailure.notFound();
-        entries.remove(entryId);
-        sessionsByEntry.remove(entryId);
-      });
+    final e = entries[entryId];
+    if (e == null || e.userId != _me) throw const AppFailure.notFound();
+    entries.remove(entryId);
+    sessionsByEntry.remove(entryId);
+  });
 
   @override
   Future<LibraryEntry> logProgress(String entryId, ProgressUpdate update) => _run(() {
-        final e = entries[entryId];
-        if (e == null || e.userId != _me) throw const AppFailure.notFound();
-        sessionsByEntry.putIfAbsent(entryId, () => []).insert(
-              0,
-              ReadingSession(
-                id: nextId('session'),
-                fromPage: e.currentPage,
-                toPage: update.page,
-                percent: update.percent,
-                readOn: now,
-              ),
-            );
-        final moved = e.status == ReadingStatus.wantToRead ? transitionStatus(e, ReadingStatus.reading, today: now) : e;
-        return _store(moved.copyWith(
-          currentPage: () => update.page,
-          progressPercent: () => update.percent,
-          startedAt: () => moved.startedAt ?? now,
-        ));
-      });
+    final e = entries[entryId];
+    if (e == null || e.userId != _me) throw const AppFailure.notFound();
+    sessionsByEntry
+        .putIfAbsent(entryId, () => [])
+        .insert(
+          0,
+          ReadingSession(
+            id: nextId('session'),
+            fromPage: e.currentPage,
+            toPage: update.page,
+            percent: update.percent,
+            readOn: now,
+          ),
+        );
+    final moved = e.status == ReadingStatus.wantToRead ? transitionStatus(e, ReadingStatus.reading, today: now) : e;
+    return _store(
+      moved.copyWith(
+        currentPage: () => update.page,
+        progressPercent: () => update.percent,
+        startedAt: () => moved.startedAt ?? now,
+      ),
+    );
+  });
 
   @override
   Future<List<ReadingSession>> sessions(String entryId) => _run(() => List.of(sessionsByEntry[entryId] ?? const []));
@@ -296,21 +310,22 @@ class DemoBackend
 
   @override
   Future<List<Review>> forBook(String bookId, {int limit = 20, int offset = 0}) => _run(() {
-        final list = reviews.values.where((r) => r.bookId == bookId && _visible(r.author.id)).toList()
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        return list.skip(offset).take(limit).map(_withCurrentAuthor).toList();
-      });
+    final list = reviews.values.where((r) => r.bookId == bookId && _visible(r.author.id)).toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return list.skip(offset).take(limit).map(_withCurrentAuthor).toList();
+  });
 
   @override
   Future<List<Review>> byUser(String userId) => _run(() {
-        if (!_visible(userId)) return const <Review>[];
-        return reviews.values.where((r) => r.author.id == userId).map(_withCurrentAuthor).toList()
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      });
+    if (!_visible(userId)) return const <Review>[];
+    return reviews.values.where((r) => r.author.id == userId).map(_withCurrentAuthor).toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  });
 
   @override
-  Future<Review?> mine(String bookId) =>
-      _run(() => reviews.values.where((r) => r.bookId == bookId && r.author.id == _me).map(_withCurrentAuthor).firstOrNull);
+  Future<Review?> mine(String bookId) => _run(
+    () => reviews.values.where((r) => r.bookId == bookId && r.author.id == _me).map(_withCurrentAuthor).firstOrNull,
+  );
 
   @override
   Future<Review> upsert({required String bookId, required String body, required bool containsSpoilers}) =>
@@ -340,24 +355,25 @@ class DemoBackend
 
   @override
   Future<void> delete(String reviewId) => _run(() {
-        final review = reviews[reviewId];
-        if (review?.author.id != _me) throw const AppFailure.notFound();
-        reviews.remove(reviewId);
-        activities.removeWhere(
-            (a) => a.type == ActivityType.reviewed && a.actor.id == review!.author.id && a.book.id == review.bookId);
-      });
+    final review = reviews[reviewId];
+    if (review?.author.id != _me) throw const AppFailure.notFound();
+    reviews.remove(reviewId);
+    activities.removeWhere(
+      (a) => a.type == ActivityType.reviewed && a.actor.id == review!.author.id && a.book.id == review.bookId,
+    );
+  });
 
   Review _withCurrentAuthor(Review r) => Review(
-        id: r.id,
-        author: profiles[r.author.id] ?? r.author,
-        bookId: r.bookId,
-        body: r.body,
-        containsSpoilers: r.containsSpoilers,
-        createdAt: r.createdAt,
-        rating: _ratingOf(r.author.id, r.bookId),
-        bookTitle: r.bookTitle,
-        coverUrl: r.coverUrl,
-      );
+    id: r.id,
+    author: profiles[r.author.id] ?? r.author,
+    bookId: r.bookId,
+    body: r.body,
+    containsSpoilers: r.containsSpoilers,
+    createdAt: r.createdAt,
+    rating: _ratingOf(r.author.id, r.bookId),
+    bookTitle: r.bookTitle,
+    coverUrl: r.coverUrl,
+  );
 
   Rating? _ratingOf(String userId, String bookId) =>
       entries.values.where((e) => e.userId == userId && e.book.id == bookId).firstOrNull?.rating;
@@ -365,50 +381,52 @@ class DemoBackend
   // ───────── activity ─────────
 
   ActivityType _activityFor(ReadingStatus s) => switch (s) {
-        ReadingStatus.wantToRead => ActivityType.wantToRead,
-        ReadingStatus.reading => ActivityType.started,
-        ReadingStatus.finished => ActivityType.finished,
-        ReadingStatus.dnf => ActivityType.dnf,
-      };
+    ReadingStatus.wantToRead => ActivityType.wantToRead,
+    ReadingStatus.reading => ActivityType.started,
+    ReadingStatus.finished => ActivityType.finished,
+    ReadingStatus.dnf => ActivityType.dnf,
+  };
 
   void _emit(String actorId, ActivityType type, Book book, {Rating? rating, String? excerpt, DateTime? at}) {
-    activities.add(Activity(
-      id: nextId('act'),
-      type: type,
-      actor: profiles[actorId]!,
-      book: book,
-      createdAt: at ?? now,
-      rating: rating,
-      reviewExcerpt: excerpt == null || excerpt.length <= 280 ? excerpt : '${excerpt.substring(0, 280)}…',
-    ));
+    activities.add(
+      Activity(
+        id: nextId('act'),
+        type: type,
+        actor: profiles[actorId]!,
+        book: book,
+        createdAt: at ?? now,
+        rating: rating,
+        reviewExcerpt: excerpt == null || excerpt.length <= 280 ? excerpt : '${excerpt.substring(0, 280)}…',
+      ),
+    );
   }
 
   @override
   Future<FeedPage> feed({FeedCursor? before, int limit = 20}) => _run(() {
-        final me = _me;
-        final visibleActors = {me, ...follows.where((f) => f.$1 == me).map((f) => f.$2)};
-        final sorted = activities.where((a) => visibleActors.contains(a.actor.id)).toList()
-          ..sort((a, b) {
-            final byTime = b.createdAt.compareTo(a.createdAt);
-            return byTime != 0 ? byTime : b.id.compareTo(a.id);
-          });
-        final start = before == null ? 0 : sorted.indexWhere((a) => a.id == before.id) + 1;
-        final page = sorted.skip(start).take(limit).map((a) => _decorate(a, me)).toList();
-        final more = start + page.length < sorted.length;
-        return FeedPage(page, more && page.isNotEmpty ? FeedCursor(page.last.createdAt, page.last.id) : null);
+    final me = _me;
+    final visibleActors = {me, ...follows.where((f) => f.$1 == me).map((f) => f.$2)};
+    final sorted = activities.where((a) => visibleActors.contains(a.actor.id)).toList()
+      ..sort((a, b) {
+        final byTime = b.createdAt.compareTo(a.createdAt);
+        return byTime != 0 ? byTime : b.id.compareTo(a.id);
       });
+    final start = before == null ? 0 : sorted.indexWhere((a) => a.id == before.id) + 1;
+    final page = sorted.skip(start).take(limit).map((a) => _decorate(a, me)).toList();
+    final more = start + page.length < sorted.length;
+    return FeedPage(page, more && page.isNotEmpty ? FeedCursor(page.last.createdAt, page.last.id) : null);
+  });
 
   Activity _decorate(Activity a, String me) => Activity(
-        id: a.id,
-        type: a.type,
-        actor: profiles[a.actor.id] ?? a.actor,
-        book: a.book,
-        createdAt: a.createdAt,
-        rating: a.rating,
-        reviewExcerpt: a.reviewExcerpt,
-        likeCount: likes.where((l) => l.$1 == a.id).length,
-        likedByMe: likes.contains((a.id, me)),
-      );
+    id: a.id,
+    type: a.type,
+    actor: profiles[a.actor.id] ?? a.actor,
+    book: a.book,
+    createdAt: a.createdAt,
+    rating: a.rating,
+    reviewExcerpt: a.reviewExcerpt,
+    likeCount: likes.where((l) => l.$1 == a.id).length,
+    likedByMe: likes.contains((a.id, me)),
+  );
 
   @override
   Future<void> like(String activityId) => _run(() => likes.add((activityId, _me)));

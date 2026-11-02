@@ -16,24 +16,23 @@ LibraryEntry entry(
   DateTime? added,
   DateTime? finished,
   String author = 'Someone',
-}) =>
-    LibraryEntry(
-      id: 'e-$title',
-      userId: 'u1',
-      book: Book(
-        id: 'b-$title',
-        editionId: 'ed-$title',
-        ids: const ExternalIds(),
-        title: title,
-        authors: [author],
-        pageCount: pages,
-        publishedDate: year,
-      ),
-      status: status,
-      rating: halfStars == null ? null : Rating.fromHalfStars(halfStars),
-      addedAt: added ?? DateTime(2026, 1, 1),
-      finishedAt: finished,
-    );
+}) => LibraryEntry(
+  id: 'e-$title',
+  userId: 'u1',
+  book: Book(
+    id: 'b-$title',
+    editionId: 'ed-$title',
+    ids: const ExternalIds(),
+    title: title,
+    authors: [author],
+    pageCount: pages,
+    publishedDate: year,
+  ),
+  status: status,
+  rating: halfStars == null ? null : Rating.fromHalfStars(halfStars),
+  addedAt: added ?? DateTime(2026, 1, 1),
+  finishedAt: finished,
+);
 
 void main() {
   group('Rating', () {
