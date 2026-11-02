@@ -121,6 +121,9 @@ class DemoBackend
   Future<bool> isUsernameAvailable(String username, {required String exceptUserId}) =>
       _run(() => _usernameFree(username, exceptUserId));
 
+  @override
+  bool get canUploadAvatars => false;
+
   /// Demo mode has no file storage; avatars stay as initials.
   @override
   Future<String> uploadAvatar(String userId, Uint8List bytes, {required String extension}) =>

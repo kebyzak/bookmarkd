@@ -231,7 +231,7 @@ class _Header extends StatelessWidget {
         ),
         const SizedBox(height: Space.md),
         Text(profile.name, style: context.text.headlineSmall),
-        if (profile.handle.isNotEmpty)
+        if (profile.displayName?.isNotEmpty ?? false)
           Text(profile.handle, style: context.text.bodyMedium?.copyWith(color: AppColors.textSecondary)),
         if (profile.bio?.isNotEmpty ?? false) ...[
           const SizedBox(height: Space.xs),

@@ -40,13 +40,25 @@ class _BookDetailsView extends StatelessWidget {
     final state = context.watch<BookDetailsCubit>().state;
     return MultiBlocListener(
       listeners: [
-        // Once the reader adds a catalog book, switch to its stored copy.
+        // My entry for this book changed: adopt the stored copy if it was a
+        // catalog book, and refresh community numbers that include me.
         BlocListener<LibraryCubit, LibraryState>(
-          listener: (context, library) {
+          listenWhen: (a, b) {
             final book = state.book;
-            if (book == null || book.id != null) return;
+            if (book == null) return false;
+            final before = a.entryFor(book);
+            final after = b.entryFor(book);
+            return before?.status != after?.status || before?.rating != after?.rating;
+          },
+          listener: (context, library) {
+            final book = state.book!;
+            final cubit = context.read<BookDetailsCubit>();
             final entry = library.entryFor(book);
-            if (entry != null) context.read<BookDetailsCubit>().bookStored(entry.book);
+            if (book.id == null && entry != null) {
+              cubit.bookStored(entry.book);
+            } else {
+              cubit.refreshCommunity();
+            }
           },
         ),
         // Remember successfully opened books for "Recently searched".
@@ -197,21 +209,8 @@ class _RatingsRow extends StatelessWidget {
     if (cells.isEmpty) {
       return Text('No community ratings yet', style: context.text.bodySmall);
     }
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        for (var i = 0; i < cells.length; i++) ...[
-          if (i > 0)
-            Container(
-              width: 1,
-              height: 32,
-              color: AppColors.border,
-              margin: const EdgeInsets.symmetric(horizontal: Space.md),
-            ),
-          cells[i],
-        ],
-      ],
-    );
+    // Wrap, not Row: large text sizes reflow onto a second line instead of clipping.
+    return Wrap(alignment: WrapAlignment.center, spacing: Space.xl, runSpacing: Space.sm, children: cells);
   }
 }
 

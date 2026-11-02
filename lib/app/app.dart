@@ -54,6 +54,7 @@ class _BookmarkdAppState extends State<BookmarkdApp> {
           routerConfig: _router,
           builder: (context, child) => demo
               ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const DemoBanner(),
                     // The banner already consumed the top safe area.

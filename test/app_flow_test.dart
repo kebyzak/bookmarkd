@@ -3,6 +3,7 @@ import 'package:bookmarkd/app/di.dart';
 import 'package:bookmarkd/core/config/app_config.dart';
 import 'package:bookmarkd/core/demo/demo_backend.dart';
 import 'package:bookmarkd/core/repositories.dart';
+import 'package:bookmarkd/core/widgets/rating_stars.dart';
 import 'package:bookmarkd/features/books/domain/book.dart';
 import 'package:bookmarkd/features/books/domain/catalog_query.dart';
 import 'package:bookmarkd/features/search/presentation/search_cubit.dart';
@@ -94,6 +95,17 @@ void main() {
     await tester.tap(find.text('Currently Reading'));
     await settle(tester);
     expect(find.textContaining('Currently Reading'), findsOneWidget);
+    // Community numbers refresh after my own change: I am now a reader.
+    expect(find.text('On shelves'), findsOneWidget);
+
+    // Rating an already-stored book updates the community average too.
+    await tester.tap(find.textContaining('Edit'));
+    await settle(tester);
+    await tester.tap(find.byType(RatingInput));
+    await settle(tester);
+    await tester.tapAt(const Offset(195, 40)); // dismiss the sheet
+    await settle(tester);
+    expect(find.textContaining('Community'), findsOneWidget);
 
     // Back to Home: the book is in progress there.
     await tester.pageBack();

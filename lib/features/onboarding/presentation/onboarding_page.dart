@@ -151,10 +151,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   AppAvatar(profile: _profile, size: 112),
                   const SizedBox(height: Space.md),
                   OutlinedButton.icon(
-                    onPressed: _busy ? null : _pickAvatar,
+                    onPressed: _busy || !sl<ProfileRepository>().canUploadAvatars ? null : _pickAvatar,
                     icon: const Icon(Icons.photo_library_outlined, size: 18),
                     label: Text(_profile.avatarUrl == null ? 'Choose photo' : 'Change photo'),
                   ),
+                  if (!sl<ProfileRepository>().canUploadAvatars) ...[
+                    const SizedBox(height: Space.xs),
+                    Text('Photo upload needs a live backend.', style: context.text.bodySmall),
+                  ],
                 ],
               ),
             ),

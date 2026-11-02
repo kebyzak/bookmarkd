@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../errors/app_failure.dart';
 
@@ -6,7 +7,8 @@ Dio createHttpClient() => Dio(
   BaseOptions(
     connectTimeout: const Duration(seconds: 8),
     receiveTimeout: const Duration(seconds: 12),
-    headers: {'User-Agent': 'Bookmarkd/1.0 (Flutter; contact: support@bookmarkd.app)'},
+    // Open Library asks clients to identify themselves; browsers forbid setting User-Agent.
+    headers: kIsWeb ? null : {'User-Agent': 'Bookmarkd/1.0 (Flutter; contact: support@bookmarkd.app)'},
   ),
 );
 

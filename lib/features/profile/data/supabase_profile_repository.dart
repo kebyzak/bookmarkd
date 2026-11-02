@@ -14,6 +14,9 @@ class SupabaseProfileRepository implements ProfileRepository, SocialRepository {
   String get _me => _client.auth.currentUser!.id;
 
   @override
+  bool get canUploadAvatars => true;
+
+  @override
   Future<Profile> getProfile(String userId) => guardSupabase(() async {
     final row = await _client.from('profiles').select().eq('id', userId).single();
     return Profile.fromJson(row);

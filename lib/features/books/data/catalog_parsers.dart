@@ -46,7 +46,7 @@ Book parseOpenLibraryDoc(Map<String, dynamic> json) {
     title: _clean(json['title']) ?? 'Untitled',
     subtitle: _clean(json['subtitle']),
     authors: _stringList(json['author_name']),
-    coverUrl: coverId is int ? 'https://covers.openlibrary.org/b/id/$coverId-L.jpg' : null,
+    coverUrl: coverId is int ? 'https://covers.openlibrary.org/b/id/$coverId-L.jpg?default=false' : null,
     publisher: _stringList(json['publisher']).firstOrNull,
     publishedDate: year is int ? '$year' : null,
     pageCount: positiveOrNull(json['number_of_pages_median']),

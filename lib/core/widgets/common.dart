@@ -45,7 +45,7 @@ class SectionHeader extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(Space.gutter, Space.lg, Space.xs, Space.sm),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Expanded(
             child: Column(

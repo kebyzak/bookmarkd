@@ -72,7 +72,7 @@ void main() {
       expect(book.ids.isbn10, '0140328726');
       expect(book.publishedYear, 1970);
       expect(book.pageCount, 96);
-      expect(book.coverUrl, 'https://covers.openlibrary.org/b/id/6498519-L.jpg');
+      expect(book.coverUrl, 'https://covers.openlibrary.org/b/id/6498519-L.jpg?default=false');
     });
   });
 

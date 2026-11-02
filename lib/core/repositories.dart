@@ -27,6 +27,8 @@ abstract interface class AuthRepository {
 }
 
 abstract interface class ProfileRepository {
+  /// False when the backend has no file storage (demo mode).
+  bool get canUploadAvatars;
   Future<Profile> getProfile(String userId);
   Future<Profile> updateProfile(Profile profile);
   Future<bool> isUsernameAvailable(String username, {required String exceptUserId});

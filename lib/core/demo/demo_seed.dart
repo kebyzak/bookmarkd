@@ -16,7 +16,8 @@ Book _book(String isbn13, String title, String author, int pages, String year, S
   publishedDate: year,
   categories: [category],
   description: about,
-  coverUrl: 'https://covers.openlibrary.org/b/isbn/$isbn13-L.jpg',
+  // default=false: a missing cover 404s and shows our placeholder, not a blank image.
+  coverUrl: 'https://covers.openlibrary.org/b/isbn/$isbn13-L.jpg?default=false',
 );
 
 final _catalog = [
