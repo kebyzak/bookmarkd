@@ -1,22 +1,25 @@
 import 'dart:async';
 
+import 'package:bookmarkd/app/di.dart';
+import 'package:bookmarkd/app/router/app_router.dart';
+import 'package:bookmarkd/app/theme/app_theme.dart';
+import 'package:bookmarkd/app/theme/tokens.dart';
+import 'package:bookmarkd/core/errors/app_failure.dart';
+import 'package:bookmarkd/core/repositories.dart';
+import 'package:bookmarkd/core/widgets/book_cover.dart';
+import 'package:bookmarkd/core/widgets/common.dart';
+import 'package:bookmarkd/core/widgets/skeleton.dart';
+import 'package:bookmarkd/core/widgets/states.dart';
+import 'package:bookmarkd/features/books/domain/book.dart';
+import 'package:bookmarkd/features/books/domain/catalog_query.dart';
+import 'package:bookmarkd/features/books/presentation/widgets/book_list_tile.dart';
+import 'package:bookmarkd/features/profile/domain/profile.dart';
+import 'package:bookmarkd/features/social/presentation/activity_card.dart';
+import 'package:bookmarkd/features/social/presentation/feed_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../app/di.dart';
-import '../../../app/router/app_router.dart';
-import '../../../app/theme/app_theme.dart';
-import '../../../app/theme/tokens.dart';
-import '../../../core/errors/app_failure.dart';
-import '../../../core/repositories.dart';
-import '../../../core/widgets/common.dart';
-import '../../../core/widgets/skeleton.dart';
-import '../../../core/widgets/states.dart';
-import '../../books/domain/book.dart';
-import '../../books/domain/catalog_query.dart';
-import '../../books/presentation/widgets/book_list_tile.dart';
-import '../../profile/domain/profile.dart';
 import 'discover_cubit.dart';
 import 'search_cubit.dart';
 
@@ -30,6 +33,7 @@ class SearchPage extends StatelessWidget {
     providers: [
       BlocProvider(create: (_) => SearchCubit(sl())),
       BlocProvider(create: (_) => DiscoverCubit(sl(), sl())..load()),
+      BlocProvider(create: (_) => FeedCubit(sl(), pageSize: 4)..refresh()),
     ],
     child: const _SearchView(),
   );
@@ -37,6 +41,7 @@ class SearchPage extends StatelessWidget {
 
 class _SearchView extends StatefulWidget {
   const _SearchView();
+
   @override
   State<_SearchView> createState() => _SearchViewState();
 }
@@ -66,12 +71,12 @@ class _SearchViewState extends State<_SearchView> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(Space.gutter, Space.md, Space.gutter, 0),
+              padding: const EdgeInsets.fromLTRB(Space.gutter, 28, Space.gutter, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Search', style: context.text.headlineMedium),
-                  const SizedBox(height: Space.md),
+                  Semantics(header: true, child: Text('Discover', style: context.text.displaySmall)),
+                  const SizedBox(height: 14),
                   TextField(
                     controller: _controller,
                     onChanged: (v) {
@@ -79,6 +84,9 @@ class _SearchViewState extends State<_SearchView> {
                       if (_scope == _Scope.books) context.read<SearchCubit>().queryChanged(v);
                     },
                     textInputAction: TextInputAction.search,
+                    onSubmitted: (_) {
+                      if (_scope == _Scope.books) context.read<SearchCubit>().submitted();
+                    },
                     decoration: InputDecoration(
                       hintText: _scope == _Scope.books ? 'Title, author or ISBN' : 'Find readers by username',
                       prefixIcon: const Icon(Icons.search_rounded),
@@ -96,44 +104,48 @@ class _SearchViewState extends State<_SearchView> {
                     ),
                   ),
                   const SizedBox(height: Space.sm),
-                  SizedBox(
-                    height: 36,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: [
-                        ChoiceChip(
-                          label: const Text('Readers'),
-                          avatar: const Icon(Icons.people_outline_rounded, size: 16),
-                          selected: _scope == _Scope.readers,
-                          onSelected: (on) => setState(() => _scope = on ? _Scope.readers : _Scope.books),
-                        ),
-                        const SizedBox(width: Space.xs),
-                        for (final mode in SearchMode.values) ...[
-                          ChoiceChip(
-                            label: Text(mode.label),
-                            selected: _scope == _Scope.books && search.mode == mode,
-                            onSelected: (_) {
-                              setState(() => _scope = _Scope.books);
-                              context.read<SearchCubit>()
-                                ..queryChanged(_controller.text)
-                                ..modeChanged(mode);
-                            },
-                          ),
-                          const SizedBox(width: Space.xs),
-                        ],
-                      ],
-                    ),
+                  _ScopeSwitch(
+                    scope: _scope,
+                    onChanged: (scope) {
+                      setState(() => _scope = scope);
+                      if (scope == _Scope.books) context.read<SearchCubit>().queryChanged(_controller.text);
+                    },
                   ),
+                  if (_scope == _Scope.books && hasQuery) ...[
+                    const SizedBox(height: Space.sm),
+                    SizedBox(
+                      height: 36,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: [
+                          for (final mode in SearchMode.values) ...[
+                            ChoiceChip(
+                              label: Text(mode.label),
+                              selected: search.mode == mode,
+                              onSelected: (_) => context.read<SearchCubit>().modeChanged(mode),
+                            ),
+                            const SizedBox(width: Space.xs),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
             const SizedBox(height: Space.xs),
             Expanded(
               child: AnimatedSwitcher(
-                duration: Motion.normal,
+                duration: Motion.fast,
+                switchInCurve: Motion.curve,
+                switchOutCurve: Motion.curve,
                 child: switch ((_scope, hasQuery)) {
                   (_Scope.readers, _) => _ReaderResults(key: const ValueKey('readers'), query: _controller.text),
-                  (_Scope.books, false) => _Discover(key: const ValueKey('discover'), onOpen: _open),
+                  (_Scope.books, false) => _Discover(
+                    key: const ValueKey('discover'),
+                    onOpen: _open,
+                    onFindReaders: () => setState(() => _scope = _Scope.readers),
+                  ),
                   (_Scope.books, true) => _BookResults(key: const ValueKey('results'), state: search, onOpen: _open),
                 },
               ),
@@ -147,13 +159,20 @@ class _SearchViewState extends State<_SearchView> {
 
 class _BookResults extends StatelessWidget {
   const _BookResults({super.key, required this.state, required this.onOpen});
+
   final SearchState state;
   final ValueChanged<Book> onOpen;
 
   @override
   Widget build(BuildContext context) => switch (state.status) {
     LoadStatus.initial => const SizedBox.shrink(),
-    LoadStatus.loading => const SingleChildScrollView(child: ListSkeleton(count: 6)),
+    LoadStatus.loading when state.results.isEmpty => const SingleChildScrollView(child: ListSkeleton(count: 6)),
+    LoadStatus.loading => Stack(
+      children: [
+        _list(context),
+        const Positioned(top: 0, left: 0, right: 0, child: LinearProgressIndicator(minHeight: 2)),
+      ],
+    ),
     LoadStatus.failure => ErrorState(message: state.failure!.message, onRetry: context.read<SearchCubit>().retry),
     LoadStatus.success when state.results.isEmpty => EmptyState(
       icon: Icons.search_off_rounded,
@@ -162,32 +181,45 @@ class _BookResults extends StatelessWidget {
           ? 'Try a different spelling, or search by author or ISBN.'
           : 'Try searching across all fields.',
     ),
-    LoadStatus.success => NotificationListener<ScrollNotification>(
-      onNotification: (n) {
-        if (n.metrics.extentAfter < 400) context.read<SearchCubit>().loadMore();
-        return false;
-      },
-      child: ListView.builder(
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        itemCount: state.results.length + (state.hasMore ? 1 : 0),
-        itemBuilder: (_, i) {
-          if (i == state.results.length) {
-            return const Padding(
-              padding: EdgeInsets.all(Space.lg),
-              child: Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))),
-            );
-          }
-          final book = state.results[i];
-          return BookListTile(key: ValueKey(book.key), book: book, onTap: () => onOpen(book));
-        },
-      ),
-    ),
+    LoadStatus.success => _list(context),
   };
+
+  Widget _list(BuildContext context) => NotificationListener<ScrollNotification>(
+    onNotification: (n) {
+      if (n.metrics.extentAfter < 400) context.read<SearchCubit>().loadMore();
+      return false;
+    },
+    child: ListView.builder(
+      key: ValueKey('${state.text}|${state.mode}'),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      itemCount: state.results.length + (state.hasMore && state.status == LoadStatus.success ? 1 : 0),
+      itemBuilder: (_, i) {
+        if (i == state.results.length) {
+          return Padding(
+            padding: const EdgeInsets.all(Space.lg),
+            child: Center(
+              child: state.loadMoreFailed
+                  ? TextButton.icon(
+                      onPressed: () => context.read<SearchCubit>().loadMore(retry: true),
+                      icon: const Icon(Icons.refresh_rounded, size: 18),
+                      label: const Text("Couldn't load more · Retry"),
+                    )
+                  : const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)),
+            ),
+          );
+        }
+        final book = state.results[i];
+        return BookListTile(key: ValueKey(book.key), book: book, onTap: () => onOpen(book));
+      },
+    ),
+  );
 }
 
 class _Discover extends StatelessWidget {
-  const _Discover({super.key, required this.onOpen});
+  const _Discover({super.key, required this.onOpen, required this.onFindReaders});
+
   final ValueChanged<Book> onOpen;
+  final VoidCallback onFindReaders;
 
   @override
   Widget build(BuildContext context) {
@@ -206,12 +238,30 @@ class _Discover extends StatelessWidget {
       );
     }
     final noCommunity = state.trending.isEmpty && state.popular.isEmpty;
+    final feed = context.read<FeedCubit>();
     return RefreshIndicator(
-      onRefresh: cubit.load,
+      onRefresh: () => Future.wait([cubit.load(), feed.refresh()]),
       child: ListView(
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.only(bottom: Space.xl),
         children: [
+          _FriendsLately(onFindReaders: onFindReaders),
+          if (state.trending.isNotEmpty) ...[
+            const SectionHeader(title: 'On shelves this week'),
+            SizedBox(
+              height: 108,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
+                itemCount: state.trending.length,
+                separatorBuilder: (_, _) => const SizedBox(width: Space.sm),
+                itemBuilder: (_, i) {
+                  final book = state.trending[i];
+                  return BookCover(key: ValueKey(book.key), book: book, width: 72, onTap: () => onOpen(book));
+                },
+              ),
+            ),
+          ],
           if (state.recent.isNotEmpty) ...[
             SectionHeader(title: 'Recently viewed', actionLabel: 'Clear', onAction: cubit.clearRecent),
             BookCarousel(books: state.recent, onTap: onOpen, coverWidth: 88),
@@ -225,13 +275,6 @@ class _Discover extends StatelessWidget {
               message: 'Trending and popular books come from what readers here add. Search above to start your shelf.',
             )
           else ...[
-            if (state.trending.isNotEmpty) ...[
-              const SectionHeader(
-                title: 'Trending this week',
-                subtitle: 'Most activity from readers in the last 7 days',
-              ),
-              BookCarousel(books: state.trending, onTap: onOpen),
-            ],
             if (state.popular.isNotEmpty) ...[
               const SectionHeader(title: 'Popular on Bookmarkd', subtitle: 'On the most shelves'),
               BookCarousel(books: state.popular, onTap: onOpen),
@@ -266,8 +309,109 @@ class _Discover extends StatelessWidget {
   }
 }
 
+class _ScopeSwitch extends StatelessWidget {
+  const _ScopeSwitch({required this.scope, required this.onChanged});
+
+  final _Scope scope;
+  final ValueChanged<_Scope> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(color: c.skeleton, borderRadius: const BorderRadius.all(Radius.circular(10))),
+      child: Row(
+        children: [
+          for (final (s, label) in [(_Scope.books, 'Books'), (_Scope.readers, 'Readers')])
+            Expanded(
+              child: Semantics(
+                selected: s == scope,
+                button: true,
+                child: Material(
+                  color: s == scope ? c.surface : Colors.transparent,
+                  borderRadius: const BorderRadius.all(Radius.circular(8)),
+                  child: InkWell(
+                    borderRadius: const BorderRadius.all(Radius.circular(8)),
+                    onTap: s == scope ? null : () => onChanged(s),
+                    child: SizedBox(
+                      height: 40,
+                      child: Center(
+                        child: Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: s == scope ? FontWeight.w600 : FontWeight.w500,
+                            color: s == scope ? c.textPrimary : c.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FriendsLately extends StatelessWidget {
+  const _FriendsLately({required this.onFindReaders});
+
+  final VoidCallback onFindReaders;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<FeedCubit>().state;
+    final header = SectionHeader(
+      title: 'Friends lately',
+      actionLabel: state.items.isEmpty ? null : 'See all',
+      onAction: () => context.push('/activity'),
+    );
+    final Widget body = switch (state.status) {
+      LoadStatus.initial || LoadStatus.loading => const ListSkeleton(count: 2, leadingWidth: 36, leadingHeight: 36),
+      LoadStatus.failure => Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          onPressed: context.read<FeedCubit>().refresh,
+          icon: const Icon(Icons.refresh_rounded, size: 18),
+          label: const Text("Couldn't load friends · Retry"),
+        ),
+      ),
+      _ when state.items.isEmpty => Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton(onPressed: onFindReaders, child: const Text('Follow readers to see what they’re reading')),
+      ),
+      _ => Column(
+        children: [
+          for (final (i, a) in state.items.take(4).indexed) ...[
+            if (i > 0) const Divider(),
+            ActivityCard(key: ValueKey(a.id), activity: a),
+          ],
+        ],
+      ),
+    };
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        header,
+        if (state.status == LoadStatus.loading || state.status == LoadStatus.initial)
+          body
+        else
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
+            child: body,
+          ),
+      ],
+    );
+  }
+}
+
 class _ReaderResults extends StatefulWidget {
   const _ReaderResults({super.key, required this.query});
+
   final String query;
 
   @override

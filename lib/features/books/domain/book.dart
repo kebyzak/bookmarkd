@@ -1,6 +1,5 @@
 import 'package:equatable/equatable.dart';
 
-/// External identifiers of a specific edition.
 class ExternalIds extends Equatable {
   const ExternalIds({this.googleBooksId, this.openLibraryId, this.isbn10, this.isbn13});
 
@@ -9,7 +8,6 @@ class ExternalIds extends Equatable {
   final String? isbn10;
   final String? isbn13;
 
-  /// Route key for an unsaved catalog book: `gb:<id>` or `ol:<id>`.
   String? get catalogKey {
     if (googleBooksId != null) return 'gb:$googleBooksId';
     if (openLibraryId != null) return 'ol:$openLibraryId';
@@ -36,10 +34,6 @@ class ExternalIds extends Equatable {
   List<Object?> get props => [googleBooksId, openLibraryId, isbn10, isbn13];
 }
 
-/// Normalized book metadata for one edition of a work.
-///
-/// [id] (the work) and [editionId] are set once the book is stored in
-/// Bookmarkd; a catalog search result has neither.
 class Book extends Equatable {
   const Book({
     this.id,
@@ -66,18 +60,13 @@ class Book extends Equatable {
   final String? description;
   final String? coverUrl;
   final String? publisher;
-
-  /// Raw date as published by the source: `2019`, `2019-10` or `2019-10-01`.
   final String? publishedDate;
-
-  /// Null when unknown. Never zero.
   final int? pageCount;
   final List<String> categories;
   final String? language;
 
   bool get isStored => id != null && editionId != null;
 
-  /// Stable route key: the internal id when stored, otherwise a catalog key.
   String get key => id ?? ids.catalogKey ?? 'title:$title';
 
   String get authorLine => authors.isEmpty ? 'Unknown author' : authors.join(', ');
@@ -103,7 +92,6 @@ class Book extends Equatable {
     language: language,
   );
 
-  /// Shape accepted by the `upsert_catalog_book` RPC and the local cache.
   Map<String, dynamic> toJson() => {
     'id': id,
     'edition_id': editionId,

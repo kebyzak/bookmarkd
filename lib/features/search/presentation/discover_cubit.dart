@@ -1,12 +1,11 @@
+import 'package:bookmarkd/core/errors/app_failure.dart';
+import 'package:bookmarkd/core/repositories.dart';
+import 'package:bookmarkd/core/services/recent_searches_store.dart';
+import 'package:bookmarkd/core/utils/wait_all.dart';
+import 'package:bookmarkd/core/widgets/states.dart';
+import 'package:bookmarkd/features/books/domain/book.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
-import '../../../core/errors/app_failure.dart';
-import '../../../core/repositories.dart';
-import '../../../core/services/recent_searches_store.dart';
-import '../../../core/utils/wait_all.dart';
-import '../../../core/widgets/states.dart';
-import '../../books/domain/book.dart';
 
 class DiscoverState extends Equatable {
   const DiscoverState({
@@ -27,7 +26,6 @@ class DiscoverState extends Equatable {
   final List<Book> genreBooks;
   final AppFailure? failure;
 
-  /// Genres taken from real community books, most common first.
   List<String> get genres {
     final counts = <String, int>{};
     for (final b in {...trending, ...popular}) {
@@ -69,14 +67,17 @@ class DiscoverCubit extends Cubit<DiscoverState> {
   Future<void> load() async {
     emit(state.copyWith(status: LoadStatus.loading, failure: () => null));
     try {
-      final r = await waitAll([_recent.load(), _books.trending(), _books.popular()]);
+      final recent = _recent.load();
+      final trending = _books.trending();
+      final popular = _books.popular();
+      await waitAll([recent, trending, popular]);
       if (isClosed) return;
       emit(
         state.copyWith(
           status: LoadStatus.success,
-          recent: r[0] as List<Book>,
-          trending: r[1] as List<Book>,
-          popular: r[2] as List<Book>,
+          recent: await recent,
+          trending: await trending,
+          popular: await popular,
         ),
       );
     } catch (e) {
@@ -100,8 +101,6 @@ class DiscoverCubit extends Cubit<DiscoverState> {
     try {
       final books = await _books.popular(category: genre);
       if (!isClosed && state.genre == genre) emit(state.copyWith(genreBooks: books));
-    } catch (_) {
-      // Genre browsing is optional; keep the chips usable.
-    }
+    } catch (_) {}
   }
 }

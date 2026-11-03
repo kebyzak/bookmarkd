@@ -1,10 +1,10 @@
 import 'dart:typed_data';
 
+import 'package:bookmarkd/core/network/supabase_guard.dart';
+import 'package:bookmarkd/core/repositories.dart';
+import 'package:bookmarkd/core/utils/wait_all.dart';
+import 'package:bookmarkd/features/profile/domain/profile.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
-import '../../../core/network/supabase_guard.dart';
-import '../../../core/repositories.dart';
-import '../domain/profile.dart';
 
 class SupabaseProfileRepository implements ProfileRepository, SocialRepository {
   SupabaseProfileRepository(this._client);
@@ -38,12 +38,10 @@ class SupabaseProfileRepository implements ProfileRepository, SocialRepository {
 
   @override
   Future<String> uploadAvatar(String userId, Uint8List bytes, {required String extension}) => guardSupabase(() async {
-    // One file per user, overwritten on change, so old photos don't pile up.
     final path = '$userId/avatar';
     await _client.storage
         .from('avatars')
         .uploadBinary(path, bytes, fileOptions: FileOptions(upsert: true, contentType: 'image/$extension'));
-    // Same URL every time: the version query makes CDN and image caches fetch the new photo.
     return '${_client.storage.from('avatars').getPublicUrl(path)}?v=${DateTime.now().millisecondsSinceEpoch}';
   });
 
@@ -57,9 +55,10 @@ class SupabaseProfileRepository implements ProfileRepository, SocialRepository {
 
   @override
   Future<FollowCounts> followCounts(String userId) => guardSupabase(() async {
-    final followers = await _client.from('follows').count().eq('followee_id', userId);
-    final following = await _client.from('follows').count().eq('follower_id', userId);
-    return FollowCounts(followers: followers, following: following);
+    final followers = _client.from('follows').count().eq('followee_id', userId);
+    final following = _client.from('follows').count().eq('follower_id', userId);
+    await waitAll([followers, following]);
+    return FollowCounts(followers: await followers, following: await following);
   });
 
   @override

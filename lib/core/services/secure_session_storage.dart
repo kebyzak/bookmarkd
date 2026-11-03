@@ -1,8 +1,6 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Persists the Supabase session (refresh token) in the Keychain / Keystore
-/// instead of plain shared preferences.
 class SecureSessionStorage extends LocalStorage {
   const SecureSessionStorage();
 

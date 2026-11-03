@@ -1,9 +1,9 @@
+import 'package:bookmarkd/app/theme/tokens.dart';
+import 'package:bookmarkd/core/widgets/states.dart';
+import 'package:bookmarkd/features/auth/presentation/session_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../app/theme/tokens.dart';
-import '../../../../core/widgets/states.dart';
-import '../session_cubit.dart';
 import 'brand_mark.dart';
 
 class SplashPage extends StatelessWidget {

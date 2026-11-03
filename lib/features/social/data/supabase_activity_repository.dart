@@ -1,11 +1,10 @@
+import 'package:bookmarkd/core/network/supabase_guard.dart';
+import 'package:bookmarkd/core/repositories.dart';
+import 'package:bookmarkd/features/books/domain/book.dart';
+import 'package:bookmarkd/features/library/domain/rating.dart';
+import 'package:bookmarkd/features/profile/domain/profile.dart';
+import 'package:bookmarkd/features/social/domain/activity.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
-import '../../../core/network/supabase_guard.dart';
-import '../../../core/repositories.dart';
-import '../../books/domain/book.dart';
-import '../../library/domain/rating.dart';
-import '../../profile/domain/profile.dart';
-import '../domain/activity.dart';
 
 class SupabaseActivityRepository implements ActivityRepository {
   SupabaseActivityRepository(this._client);

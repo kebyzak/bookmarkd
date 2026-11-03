@@ -1,10 +1,9 @@
+import 'package:bookmarkd/core/errors/app_failure.dart';
+import 'package:bookmarkd/core/repositories.dart';
+import 'package:bookmarkd/core/widgets/states.dart';
+import 'package:bookmarkd/features/social/domain/activity.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
-import '../../../core/errors/app_failure.dart';
-import '../../../core/repositories.dart';
-import '../../../core/widgets/states.dart';
-import '../domain/activity.dart';
 
 class FeedState extends Equatable {
   const FeedState({
@@ -12,6 +11,7 @@ class FeedState extends Equatable {
     this.items = const [],
     this.next,
     this.loadingMore = false,
+    this.loadMoreFailed = false,
     this.failure,
   });
 
@@ -19,6 +19,7 @@ class FeedState extends Equatable {
   final List<Activity> items;
   final FeedCursor? next;
   final bool loadingMore;
+  final bool loadMoreFailed;
   final AppFailure? failure;
 
   bool get hasMore => next != null;
@@ -28,17 +29,19 @@ class FeedState extends Equatable {
     List<Activity>? items,
     FeedCursor? Function()? next,
     bool? loadingMore,
+    bool? loadMoreFailed,
     AppFailure? Function()? failure,
   }) => FeedState(
     status: status ?? this.status,
     items: items ?? this.items,
     next: next != null ? next() : this.next,
     loadingMore: loadingMore ?? this.loadingMore,
+    loadMoreFailed: loadMoreFailed ?? this.loadMoreFailed,
     failure: failure != null ? failure() : this.failure,
   );
 
   @override
-  List<Object?> get props => [status, items, next, loadingMore, failure];
+  List<Object?> get props => [status, items, next, loadingMore, loadMoreFailed, failure];
 }
 
 class FeedCubit extends Cubit<FeedState> {
@@ -57,9 +60,9 @@ class FeedCubit extends Cubit<FeedState> {
     }
   }
 
-  Future<void> loadMore() async {
-    if (!state.hasMore || state.loadingMore) return;
-    emit(state.copyWith(loadingMore: true));
+  Future<void> loadMore({bool retry = false}) async {
+    if (!state.hasMore || state.loadingMore || (state.loadMoreFailed && !retry)) return;
+    emit(state.copyWith(loadingMore: true, loadMoreFailed: false));
     try {
       final page = await _activity.feed(before: state.next, limit: pageSize);
       final known = state.items.map((a) => a.id).toSet();
@@ -73,8 +76,7 @@ class FeedCubit extends Cubit<FeedState> {
         );
       }
     } catch (_) {
-      // Keep what is loaded; scrolling again retries.
-      if (!isClosed) emit(state.copyWith(loadingMore: false));
+      if (!isClosed) emit(state.copyWith(loadingMore: false, loadMoreFailed: true));
     }
   }
 
@@ -83,9 +85,9 @@ class FeedCubit extends Cubit<FeedState> {
     _replace(toggled);
     try {
       activity.likedByMe ? await _activity.unlike(activity.id) : await _activity.like(activity.id);
-    } catch (e) {
+    } catch (_) {
       _replace(activity);
-      throw AppFailure.from(e);
+      rethrow;
     }
   }
 

@@ -1,137 +1,96 @@
-# Bookmarkd
+<p align="center">
+  <img src="assets/logo.png" alt="Bookmarkd logo" width="128" height="128">
+</p>
 
-A book tracker with a light social layer — Letterboxd for books.
-Flutter 3 (iOS + Android), Supabase backend, Google Books catalog with an Open Library fallback.
+<h1 align="center">Bookmarkd</h1>
 
-Track what you want to read, are reading and have finished; log progress; rate (half stars) and review;
-follow readers and see what they're reading.
+<p align="center"><strong>Your reading life, beautifully kept.</strong></p>
 
-## Set up
+Bookmarkd is a quiet home for the books you read. Log where you are in a few taps, see your year fill up
+one spine at a time, and find your next book through the people whose taste you trust.
 
-The app always talks to Supabase; a build without `SUPABASE_URL` and the key stops at startup
-with an error saying so.
+Made for readers, not for feeds: no streaks to protect, no badges to chase, just your books, on a page
+that feels like paper.
 
-1. Create a Supabase project.
-2. Apply the schema — either paste
-   `supabase/migrations/20261102000000_initial_schema.sql` into the SQL editor and run it, or with the CLI:
-   ```bash
-   supabase link --project-ref <your-project-ref>
-   ```
-   ```bash
-   supabase db push
-   ```
-   This creates the tables, RLS policies, indexes, activity triggers, RPC functions and a public
-   `avatars` storage bucket.
-   Then deploy the Edge Function that saves books (it fetches metadata server-side, so clients can't
-   write fake titles or covers into the shared catalog):
-   ```bash
-   supabase functions deploy save-book
-   ```
-   ```bash
-   supabase secrets set GOOGLE_BOOKS_API_KEY=<your key>
-   ```
-   The key is strongly recommended here: all saves come from Supabase's servers, and keyless Google
-   requests are rate-limited per IP.
-3. In **Authentication → URL configuration → Redirect URLs**, add
-   `com.bookmarkd.bookmarkd://reset-password`. The password-reset email links back into the app
-   (registered in `AndroidManifest.xml` and `Info.plist`), which then asks for a new password.
-4. Create a `.env` file in the project root (it is gitignored):
-   ```
-   SUPABASE_URL=https://<project-ref>.supabase.co
-   SUPABASE_PUBLISHABLE_KEY=<publishable or anon key>
-   GOOGLE_BOOKS_API_KEY=
-   PASSWORD_RESET_REDIRECT=
-   ```
-   Only the publishable/anon key goes here — it is public by design and data is protected by RLS.
-   **Never put the service-role key in the app.** `PASSWORD_RESET_REDIRECT` can stay empty (defaults to
-   `com.bookmarkd.bookmarkd://reset-password`). `GOOGLE_BOOKS_API_KEY` is optional but recommended:
-   without it Google rate-limits quickly (the app then falls back to Open Library).
-5. Run:
-   ```bash
-   flutter run --dart-define-from-file=.env
-   ```
+---
 
-## Release builds
+## Log your page in two taps
 
-Every build needs the same `--dart-define-from-file=.env`.
+Open the book you're reading, tap **Log**, type the page you're on. That's it.
 
-**Android.** Create an upload key once (keep the file and passwords safe — losing them means you can
-no longer update the app on Google Play):
-```bash
-keytool -genkey -v -keystore android/app/upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
-```
-Then create `android/key.properties` (gitignored):
-```
-storePassword=<password>
-keyPassword=<password>
-keyAlias=upload
-storeFile=upload-keystore.jks
-```
-`storeFile` is relative to `android/app`. Without this file, release builds are signed with the debug
-key and Google Play will reject them.
-```bash
-flutter build appbundle --dart-define-from-file=.env
-```
+- Quick buttons for **+10, +25 and +50 pages**, so a normal evening is one tap.
+- A live line tells you how far you've come: *"+25 pages since yesterday · 30%"*.
+- Editions without a page count? Log by percentage instead.
+- Every update is kept, so you can look back at how a book unfolded, day by day.
 
-**iOS.** Open `ios/Runner.xcworkspace` in Xcode, set your Team under Signing & Capabilities, then:
-```bash
-flutter build ipa --dart-define-from-file=.env
-```
+## Finishing a book feels like finishing a book
 
-Bump `version:` in `pubspec.yaml` (e.g. `1.0.1+2`) before every store upload.
+Reach the last page and Bookmarkd marks the moment.
 
-## Project layout
+- **"Book 7 of 2026"**: see where it lands in your year, and how many are left for your goal.
+- *"880 pages over 41 days"*: a small record of the time you spent with it.
+- Watch it join your shelf for the year, outlined in gold.
+- Rate it while it's fresh, with a word for every star, from *Not for me* to *A favourite*,
+  and write one line about what stayed with you.
+- Not ready to rate it yet? Choose **Rate it later**.
 
-```
-lib/
-  app/            app widget, DI (get_it), router (go_router), theme tokens
-  core/           repository interfaces, errors, network, services, shared widgets
-  features/
-    auth/ onboarding/ home/ books/ search/ library/
-    reading/ reviews/ social/ profile/ statistics/
-      domain/       pure models and rules
-      data/         Supabase / HTTP implementations
-      presentation/ cubits, pages, widgets
-supabase/migrations/   SQL schema, RLS, triggers, RPCs
-supabase/functions/    save-book Edge Function
-docs/ARCHITECTURE.md   data model, glossary, routes, APIs, design system
-```
+## Your year, on a shelf
 
-State: `flutter_bloc` cubits. The signed-in session and the reader's library are app-wide cubits;
-everything else is scoped to its screen. Library writes are optimistic and roll back on failure.
+Every book you finish this year stands as a spine on your **Reading** screen: thicker for the long
+ones, each in its own colour. Set a yearly goal and the empty slots show what's still ahead.
+Your books in progress sit right above it, with your page, your percentage and the Log button.
+The next three books you want to read wait just below.
 
-## Key design decisions
+## A shelf that's actually yours
 
-- **Work vs edition.** `books` is the literary work, `book_editions` a specific printing (ISBNs, pages,
-  cover). A reader has at most one library entry per work, pointing at the edition they read.
-- **Only added books are stored.** Search hits the external catalog; metadata is saved (deduplicated by
-  Google id → Open Library id → ISBN-13 → ISBN-10) only when someone adds the book, via the
-  `save-book` Edge Function, which fetches the metadata itself and calls `upsert_catalog_book`
-  (service role only). Clients send ids, never metadata, and cannot write book tables.
-- **The database owns invariants.** Activity feed events are written by triggers; progress updates go
-  through `log_reading_progress`, which validates the page against the edition and records a session
-  atomically. Follows can't target yourself; likes and follows are unique.
-- **Privacy.** A private profile's library, reviews and activity are visible only to its owner.
-  Emails stay in `auth.users`.
-- **No invented data.** Popular / trending / community ratings come from real library data only.
-  Recommendations are a stated heuristic: "popular in your most-read genre".
-- **Sessions** are stored in the Keychain / Keystore (`flutter_secure_storage`).
+Everything you've added, sorted the way you think about books:
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full schema and routes.
+- **Want to read**, **Reading**, **Finished** and **Did not finish**, because not every book deserves an ending.
+- Ratings in **half stars**: 3.5 is a real opinion.
+- Mark your **favourites**.
+- Start and finish dates, editable whenever you remember better.
+- View it as a cover grid or a list, sort it by what matters to you, and filter it by title or author.
 
-## Database tests
+## Discover through people, not algorithms
 
-`supabase/tests/database/privacy.test.sql` (pgTAP) checks that a private reader's library, reviews and
-activity are hidden from others and that clients cannot write catalog books. Run against a local stack:
+- Search millions of books by **title, author or ISBN**.
+- **Friends lately**: see what the readers you follow just started, finished and reviewed,
+  with their words quoted right in the feed.
+- **On shelves this week**: what's being picked up by readers around you.
+- Recommendations come from your **most-read genre**, and Bookmarkd tells you exactly why it suggests something.
+- Browse by genre, and find books you viewed recently.
 
-```bash
-supabase test db
-```
+## Every book has its own page
 
-## Status and known gaps
+Each book's page takes its colours from the book itself. Alongside the cover and the essentials you'll find:
 
-- The Supabase setup (migrations, Edge Function, repositories) has **not been run against a live
-  project** yet; expect to fix small issues on first deploy.
-- Apple / Google sign-in are not implemented; auth goes through `AuthRepository`, so they can be added there.
-- No follow requests: "private" means visible to you only.
-- Google Books cover images may not load in a Flutter **web** build (web is not a target platform).
+- the community rating and how many shelves the book is on, counted from real readers only;
+- reviews from readers, set as quotes, with spoilers hidden until you choose to read them;
+- what the book is about, plus edition details like pages, publisher and ISBN.
+
+Your status and your progress stay pinned at the bottom of the page, one tap away.
+
+## Reviews worth reading
+
+Write as much or as little as you like. Mark a review as containing spoilers and others will only see
+it when they choose to. Your reviews live on your profile, alongside the books you've finished and loved.
+
+## Follow readers you trust
+
+Follow friends, and anyone whose taste you like. Like their updates. Visit their profiles to see what
+they're reading, what they've finished and what they thought of it.
+
+## Private when you want it
+
+Make your profile private and your library, reviews and activity are visible to you alone.
+Bookmarkd never shows invented numbers: every count and rating comes from real readers.
+
+## Easy on the eyes, day and night
+
+A warm paper palette by day and a soft charcoal theme by night, so your reading app doesn't keep you
+awake. Book titles and reviews are set in a classic serif, and the covers bring the colour.
+Bookmarkd follows your phone's light or dark setting automatically.
+
+---
+
+**Bookmarkd for iPhone and Android.** Keep track of what you read, and why it mattered.

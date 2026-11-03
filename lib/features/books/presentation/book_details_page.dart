@@ -1,33 +1,42 @@
+import 'package:bookmarkd/app/di.dart';
+import 'package:bookmarkd/app/router/app_router.dart';
+import 'package:bookmarkd/app/theme/app_theme.dart';
+import 'package:bookmarkd/app/theme/tokens.dart';
+import 'package:bookmarkd/core/services/recent_searches_store.dart';
+import 'package:bookmarkd/core/utils/formatters.dart';
+import 'package:bookmarkd/core/widgets/book_cover.dart';
+import 'package:bookmarkd/core/widgets/common.dart';
+import 'package:bookmarkd/core/widgets/rating_stars.dart';
+import 'package:bookmarkd/core/widgets/skeleton.dart';
+import 'package:bookmarkd/core/widgets/states.dart';
+import 'package:bookmarkd/features/books/domain/book.dart';
+import 'package:bookmarkd/features/books/domain/book_stats.dart';
+import 'package:bookmarkd/features/library/domain/library_entry.dart';
+import 'package:bookmarkd/features/library/domain/reading_status.dart';
+import 'package:bookmarkd/features/library/presentation/library_cubit.dart';
+import 'package:bookmarkd/features/library/presentation/library_sheet.dart';
+import 'package:bookmarkd/features/reading/presentation/log_sheet.dart';
+import 'package:bookmarkd/features/reviews/presentation/review_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../app/di.dart';
-import '../../../app/router/app_router.dart';
-import '../../../app/theme/app_theme.dart';
-import '../../../app/theme/tokens.dart';
-import '../../../core/services/recent_searches_store.dart';
-import '../../../core/utils/formatters.dart';
-import '../../../core/widgets/book_cover.dart';
-import '../../../core/widgets/common.dart';
-import '../../../core/widgets/skeleton.dart';
-import '../../../core/widgets/states.dart';
-import '../../library/domain/library_entry.dart';
-import '../../library/domain/reading_status.dart';
-import '../../library/presentation/library_cubit.dart';
-import '../../library/presentation/library_sheet.dart';
-import '../../reviews/presentation/review_tile.dart';
-import '../domain/book.dart';
-import '../domain/book_stats.dart';
 import 'book_details_cubit.dart';
 
 class BookDetailsPage extends StatelessWidget {
   const BookDetailsPage({super.key, required this.bookKey});
+
   final String bookKey;
 
   @override
   Widget build(BuildContext context) => BlocProvider(
-    create: (_) => BookDetailsCubit(bookKey: bookKey, catalog: sl(), books: sl(), reviews: sl())..load(),
+    create: (context) => BookDetailsCubit(
+      bookKey: bookKey,
+      catalog: sl(),
+      books: sl(),
+      reviews: sl(),
+      librarySynced: context.read<LibraryCubit>().synced,
+    )..load(),
     child: const _BookDetailsView(),
   );
 }
@@ -40,15 +49,10 @@ class _BookDetailsView extends StatelessWidget {
     final state = context.watch<BookDetailsCubit>().state;
     return MultiBlocListener(
       listeners: [
-        // My entry for this book changed: adopt the stored copy if it was a
-        // catalog book, and refresh community numbers that include me.
         BlocListener<LibraryCubit, LibraryState>(
           listenWhen: (a, b) {
             final book = state.book;
-            if (book == null) return false;
-            final before = a.entryFor(book);
-            final after = b.entryFor(book);
-            return before?.status != after?.status || before?.rating != after?.rating;
+            return book != null && a.entryFor(book) == null && b.entryFor(book) != null;
           },
           listener: (context, library) {
             final book = state.book!;
@@ -61,15 +65,14 @@ class _BookDetailsView extends StatelessWidget {
             }
           },
         ),
-        // Remember successfully opened books for "Recently searched".
         BlocListener<BookDetailsCubit, BookDetailsState>(
           listenWhen: (a, b) => a.book?.key != b.book?.key && b.book != null,
           listener: (_, s) => sl<RecentSearchesStore>().remember(s.book!),
         ),
       ],
       child: Scaffold(
-        appBar: AppBar(backgroundColor: Colors.transparent),
-        extendBodyBehindAppBar: true,
+        appBar: state.status == LoadStatus.success ? null : AppBar(),
+        bottomNavigationBar: state.status == LoadStatus.success ? _ActionBar(book: state.book!) : null,
         body: switch (state.status) {
           LoadStatus.failure => SafeArea(
             child: ErrorState(message: state.failure!.message, onRetry: context.read<BookDetailsCubit>().load),
@@ -87,6 +90,7 @@ class _BookDetailsView extends StatelessWidget {
 
 class _Content extends StatelessWidget {
   const _Content({required this.book, required this.stats, required this.state});
+
   final Book book;
   final BookStats stats;
   final BookDetailsState state;
@@ -95,51 +99,32 @@ class _Content extends StatelessWidget {
   Widget build(BuildContext context) {
     final entry = context.select<LibraryCubit, LibraryEntry?>((c) => c.state.entryFor(book));
     final shown = entry?.book ?? book;
-    final width = MediaQuery.sizeOf(context).width;
-    final coverWidth = (width * 0.46).clamp(140.0, 220.0);
 
     return ListView(
-      padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top + kToolbarHeight, bottom: Space.xxl),
+      padding: const EdgeInsets.only(bottom: Space.xl),
       children: [
-        Center(
-          child: BookCover(book: shown, width: coverWidth),
+        _Header(book: shown, entry: entry),
+        _NumbersRow(stats: stats, entry: entry),
+        SectionHeader(
+          title: 'From readers',
+          actionLabel: entry != null ? 'Write a review' : null,
+          onAction: entry == null ? null : () => context.push(Routes.review(entry.book.id!)),
         ),
-        const SizedBox(height: Space.lg),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
-          child: Column(
-            children: [
-              Text(shown.title, textAlign: TextAlign.center, style: context.text.headlineSmall),
-              if (shown.subtitle != null) ...[
-                const SizedBox(height: Space.xxs),
-                Text(
-                  shown.subtitle!,
-                  textAlign: TextAlign.center,
-                  style: context.text.bodyMedium?.copyWith(color: AppColors.textSecondary),
-                ),
-              ],
-              const SizedBox(height: Space.xs),
-              Text(
-                shown.authorLine,
-                textAlign: TextAlign.center,
-                style: context.text.titleMedium?.copyWith(color: AppColors.accent),
-              ),
-              if (_publication(shown) case final pub?) ...[
-                const SizedBox(height: Space.xxs),
-                Text(pub, textAlign: TextAlign.center, style: context.text.bodySmall),
-              ],
-              const SizedBox(height: Space.md),
-              _RatingsRow(stats: stats, entry: entry),
-              const SizedBox(height: Space.lg),
-              _PrimaryAction(book: shown, entry: entry),
-            ],
-          ),
-        ),
-        if (entry != null && entry.status == ReadingStatus.reading)
+        if (state.reviews.isEmpty)
           Padding(
-            padding: const EdgeInsets.fromLTRB(Space.gutter, Space.md, Space.gutter, 0),
-            child: _ProgressCard(entry: entry),
-          ),
+            padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
+            child: Text(
+              entry == null
+                  ? 'No reviews yet. Add this book to your library to write the first one.'
+                  : 'No reviews yet. Be the first.',
+              style: context.text.bodyMedium?.copyWith(color: context.colors.textSecondary),
+            ),
+          )
+        else
+          for (final (i, r) in state.reviews.indexed) ...[
+            if (i > 0) const Divider(indent: Space.gutter, endIndent: Space.gutter),
+            ReviewTile(key: ValueKey(r.id), review: r),
+          ],
         if (shown.description != null) ...[
           const SectionHeader(title: 'About'),
           Padding(
@@ -160,147 +145,268 @@ class _Content extends StatelessWidget {
         ],
         const SectionHeader(title: 'Details'),
         _FactsTable(book: shown),
-        SectionHeader(
-          title: 'Reviews',
-          subtitle: state.reviews.isEmpty ? null : '${state.reviews.length} from readers',
-          actionLabel: entry != null ? 'Write a review' : null,
-          onAction: entry == null ? null : () => context.push(Routes.review(entry.book.id!)),
-        ),
-        if (state.reviews.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
-            child: Text(
-              entry == null
-                  ? 'No reviews yet. Add this book to your library to write the first one.'
-                  : 'No reviews yet. Be the first.',
-              style: context.text.bodyMedium?.copyWith(color: AppColors.textSecondary),
-            ),
-          )
-        else
-          ...state.reviews.map((r) => ReviewTile(key: ValueKey(r.id), review: r)),
       ],
     );
   }
-
-  static String? _publication(Book b) {
-    final parts = [if (b.publisher != null) b.publisher!, if (b.publishedYear != null) '${b.publishedYear}'];
-    return parts.isEmpty ? null : parts.join(' · ');
-  }
 }
 
-class _RatingsRow extends StatelessWidget {
-  const _RatingsRow({required this.stats, required this.entry});
-  final BookStats stats;
-  final LibraryEntry? entry;
+class _Header extends StatelessWidget {
+  const _Header({required this.book, required this.entry});
 
-  @override
-  Widget build(BuildContext context) {
-    final cells = <Widget>[
-      if (stats.hasRatings)
-        _RatingCell(
-          label: 'Community · ${formatCount(stats.ratingCount)}',
-          value: formatStars(stats.averageRating!),
-          stars: stats.averageRating!,
-        ),
-      if (entry?.rating != null)
-        _RatingCell(label: 'You', value: formatStars(entry!.rating!.stars), stars: entry!.rating!.stars),
-      if (stats.readerCount > 0) _RatingCell(label: 'On shelves', value: formatCount(stats.readerCount)),
-    ];
-    if (cells.isEmpty) {
-      return Text('No community ratings yet', style: context.text.bodySmall);
-    }
-    // Wrap, not Row: large text sizes reflow onto a second line instead of clipping.
-    return Wrap(alignment: WrapAlignment.center, spacing: Space.xl, runSpacing: Space.sm, children: cells);
-  }
-}
-
-class _RatingCell extends StatelessWidget {
-  const _RatingCell({required this.label, required this.value, this.stars});
-  final String label;
-  final String value;
-  final double? stars;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(value, style: context.text.titleMedium),
-          if (stars != null) ...[
-            const SizedBox(width: 4),
-            const Icon(Icons.star_rounded, size: 16, color: AppColors.star),
-          ],
-        ],
-      ),
-      Text(label, style: context.text.bodySmall),
-    ],
-  );
-}
-
-class _PrimaryAction extends StatelessWidget {
-  const _PrimaryAction({required this.book, required this.entry});
   final Book book;
   final LibraryEntry? entry;
 
   @override
   Widget build(BuildContext context) {
-    final e = entry;
-    if (e == null) {
-      return SizedBox(
-        width: double.infinity,
-        child: FilledButton.icon(
-          onPressed: () => showLibrarySheet(context, book),
-          icon: const Icon(Icons.add_rounded),
-          label: const Text('Add to Library'),
+    final c = context.colors;
+    final tone = coverTone(book.title);
+    final facts = [
+      if (book.publishedYear != null) '${book.publishedYear}',
+      if (book.pageCount != null) '${book.pageCount} pages',
+    ].join(' · ');
+
+    return ColoredBox(
+      color: Color.alphaBlend(tone.withValues(alpha: 0.16), c.background),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          Space.gutter,
+          MediaQuery.paddingOf(context).top + Space.xxs,
+          Space.gutter,
+          Space.lg,
         ),
-      );
-    }
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        style: OutlinedButton.styleFrom(
-          backgroundColor: AppColors.accentSoft,
-          foregroundColor: AppColors.accent,
-          side: const BorderSide(color: AppColors.accentSoft),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Transform.translate(
+              offset: const Offset(-Space.sm, 0),
+              child: Row(
+                children: [
+                  const BackButton(),
+                  const Spacer(),
+                  if (entry != null)
+                    Transform.translate(
+                      offset: const Offset(Space.sm * 2, 0),
+                      child: IconButton(
+                        tooltip: 'More options',
+                        onPressed: () => showLibrarySheet(context, entry!.book),
+                        icon: const Icon(Icons.more_horiz_rounded),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: Space.xs),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: Radii.cover,
+                    boxShadow: [
+                      BoxShadow(color: tone.withValues(alpha: 0.22), blurRadius: 20, offset: const Offset(0, 8)),
+                    ],
+                  ),
+                  child: BookCover(book: book, width: 112),
+                ),
+                const SizedBox(width: 18),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Semantics(
+                        header: true,
+                        child: Text(book.title, style: context.text.displaySmall?.copyWith(fontSize: 32, height: 1.05)),
+                      ),
+                      if (book.subtitle != null) ...[
+                        const SizedBox(height: Space.xxs),
+                        Text(book.subtitle!, style: context.text.bodySmall?.copyWith(color: c.textSecondary)),
+                      ],
+                      const SizedBox(height: Space.xxs),
+                      Text(book.authorLine, style: context.text.bodyLarge),
+                      if (facts.isNotEmpty) ...[
+                        const SizedBox(height: Space.xxs),
+                        Text(
+                          facts,
+                          style: context.text.bodySmall?.copyWith(
+                            color: c.textSecondary,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
-        onPressed: () => showLibrarySheet(context, e.book),
-        icon: Icon(statusIcons[e.status]),
-        label: Text('${e.status.label}  ·  Edit'),
       ),
     );
   }
 }
 
-class _ProgressCard extends StatelessWidget {
-  const _ProgressCard({required this.entry});
-  final LibraryEntry entry;
+class _NumbersRow extends StatelessWidget {
+  const _NumbersRow({required this.stats, required this.entry});
+
+  final BookStats stats;
+  final LibraryEntry? entry;
 
   @override
   Widget build(BuildContext context) {
-    final pages = entry.book.pageCount;
-    final detail = pages != null && entry.currentPage != null
-        ? 'Page ${entry.currentPage} of $pages'
-        : '${entry.progressPercentDisplay}% read';
-    return SurfaceCard(
-      onTap: () => context.push(Routes.progress(entry.book.id!)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final c = context.colors;
+    final small = context.text.bodySmall?.copyWith(color: c.textSecondary, height: 1.4);
+    final big = TextStyle(
+      fontFamily: AppTheme.serif,
+      fontSize: 30,
+      height: 1,
+      color: c.textPrimary,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+    final shelves = '${formatCount(stats.readerCount)} ${stats.readerCount == 1 ? 'shelf' : 'shelves'}';
+    final ratings = '${formatCount(stats.ratingCount)} ${stats.ratingCount == 1 ? 'rating' : 'ratings'}';
+    final mine = entry?.rating;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: Space.gutter, vertical: 18),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: c.border)),
+      ),
+      child: Row(
         children: [
-          Row(
-            children: [
-              Expanded(child: Text(detail, style: context.text.titleSmall)),
-              Text(
-                '${entry.progressPercentDisplay}%',
-                style: context.text.titleSmall?.copyWith(color: AppColors.accent),
-              ),
-            ],
+          if (stats.hasRatings) ...[
+            Text(formatStars(stats.averageRating!), style: big),
+            const SizedBox(width: 6),
+            Icon(Icons.star_rounded, size: 18, color: c.star),
+            const SizedBox(width: Space.md),
+          ],
+          Expanded(
+            child: Text(
+              stats.hasRatings
+                  ? 'from $ratings\non $shelves'
+                  : stats.readerCount > 0
+                  ? 'No ratings yet\non $shelves'
+                  : 'No ratings yet',
+              style: small,
+            ),
           ),
-          const SizedBox(height: Space.xs),
-          AppProgressBar(value: entry.progress),
-          const SizedBox(height: Space.xs),
-          Text('Tap to update progress', style: context.text.bodySmall),
+          if (mine != null)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text('You', style: small),
+                RatingStars(stars: mine.stars, size: 14),
+              ],
+            ),
         ],
+      ),
+    );
+  }
+}
+
+class _ActionBar extends StatelessWidget {
+  const _ActionBar({required this.book});
+
+  final Book book;
+
+  static const _shape = RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10)));
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final entry = context.select<LibraryCubit, LibraryEntry?>((cubit) => cubit.state.entryFor(book));
+    final adding = context.select<LibraryCubit, bool>((cubit) => cubit.state.adding.contains(book.key));
+
+    final Widget content;
+    if (entry == null) {
+      content = FilledButton.icon(
+        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52), shape: _shape),
+        onPressed: adding ? null : () => showLibrarySheet(context, book),
+        icon: adding
+            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+            : const Icon(Icons.add_rounded),
+        label: Text(adding ? 'Adding…' : 'Add to library'),
+      );
+    } else {
+      final pages = entry.book.pageCount;
+      final detail = switch (entry.status) {
+        ReadingStatus.reading =>
+          pages != null && entry.currentPage != null
+              ? 'p. ${entry.currentPage} · ${entry.progressPercentDisplay}%'
+              : '${entry.progressPercentDisplay}%',
+        ReadingStatus.finished => entry.finishedAt == null ? null : formatDate(entry.finishedAt!),
+        _ => null,
+      };
+      content = Row(
+        children: [
+          Expanded(
+            child: Semantics(
+              button: true,
+              label: '${entry.status.label}${detail == null ? '' : ', $detail'}. Change status',
+              excludeSemantics: true,
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  backgroundColor: c.surface,
+                  foregroundColor: c.textPrimary,
+                  side: BorderSide(color: c.border),
+                  shape: _shape,
+                ),
+                onPressed: () => showLibrarySheet(context, entry.book),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(entry.status.label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                          if (detail != null)
+                            Text(
+                              detail,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w400,
+                                color: c.textSecondary,
+                                fontFeatures: const [FontFeature.tabularFigures()],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (entry.status == ReadingStatus.reading) ...[
+            const SizedBox(width: 10),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(104, 52),
+                shape: _shape,
+                textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              onPressed: () => showLogSheet(context, entry),
+              child: const Text('Log'),
+            ),
+          ],
+        ],
+      );
+    }
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: c.surface,
+        border: Border(top: BorderSide(color: c.border)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: Space.gutter, vertical: Space.sm),
+          child: content,
+        ),
       ),
     );
   }
@@ -308,6 +414,7 @@ class _ProgressCard extends StatelessWidget {
 
 class _ExpandableText extends StatefulWidget {
   const _ExpandableText(this.text);
+
   final String text;
 
   @override
@@ -323,12 +430,13 @@ class _ExpandableTextState extends State<_ExpandableText> {
     children: [
       AnimatedSize(
         duration: Motion.normal,
+        curve: Motion.curve,
         alignment: Alignment.topCenter,
         child: Text(
           widget.text,
           maxLines: _open ? null : 6,
           overflow: _open ? null : TextOverflow.fade,
-          style: context.text.bodyMedium,
+          style: context.text.bodyMedium?.copyWith(fontSize: 15, height: 1.55),
         ),
       ),
       if (widget.text.length > 320)
@@ -343,6 +451,7 @@ class _ExpandableTextState extends State<_ExpandableText> {
 
 class _FactsTable extends StatelessWidget {
   const _FactsTable({required this.book});
+
   final Book book;
 
   @override
@@ -363,24 +472,21 @@ class _FactsTable extends StatelessWidget {
     }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
-      child: SurfaceCard(
-        padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: Space.xs),
-        child: Column(
-          children: [
-            for (var i = 0; i < facts.length; i++) ...[
-              if (i > 0) const Divider(),
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Row(
-                  children: [
-                    SizedBox(width: 96, child: Text(facts[i].$1, style: context.text.bodySmall)),
-                    Expanded(child: SelectableText(facts[i].$2, style: context.text.bodyMedium)),
-                  ],
-                ),
+      child: Column(
+        children: [
+          for (var i = 0; i < facts.length; i++) ...[
+            if (i > 0) const Divider(),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(
+                children: [
+                  SizedBox(width: 96, child: Text(facts[i].$1, style: context.text.bodySmall)),
+                  Expanded(child: SelectableText(facts[i].$2, style: context.text.bodyMedium)),
+                ],
               ),
-            ],
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -393,17 +499,18 @@ class _DetailsSkeleton extends StatelessWidget {
   Widget build(BuildContext context) => SafeArea(
     child: Padding(
       padding: const EdgeInsets.all(Space.gutter),
-      child: Column(
-        children: [
-          const SizedBox(height: kToolbarHeight),
-          const SkeletonBox(width: 180, height: 270),
-          const SizedBox(height: Space.lg),
-          const SkeletonBox(width: 220, height: 22),
-          const SizedBox(height: Space.xs),
-          const SkeletonBox(width: 140, height: 16),
-          const SizedBox(height: Space.lg),
-          SkeletonBox(width: double.infinity, height: 52, radius: Radii.md),
-        ],
+      child: Skeleton(
+        child: const Column(
+          children: [
+            SkeletonBox(width: 180, height: 270),
+            SizedBox(height: Space.lg),
+            SkeletonBox(width: 220, height: 22),
+            SizedBox(height: Space.xs),
+            SkeletonBox(width: 140, height: 16),
+            SizedBox(height: Space.lg),
+            SkeletonBox(width: double.infinity, height: 52, radius: Radii.md),
+          ],
+        ),
       ),
     ),
   );

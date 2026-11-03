@@ -1,11 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:bookmarkd/core/errors/app_failure.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../errors/app_failure.dart';
-
-/// Runs a Supabase call and converts every error into an [AppFailure].
 Future<T> guardSupabase<T>(Future<T> Function() call) async {
   try {
     return await call();
@@ -33,7 +32,8 @@ Future<T> guardSupabase<T>(Future<T> Function() call) async {
     throw const AppFailure.network();
   } on TimeoutException {
     throw const AppFailure.network();
-  } catch (_) {
+  } catch (e, stack) {
+    FlutterError.reportError(FlutterErrorDetails(exception: e, stack: stack, library: 'supabase_guard'));
     throw const AppFailure.unknown();
   }
 }

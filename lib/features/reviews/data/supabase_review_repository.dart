@@ -1,10 +1,9 @@
+import 'package:bookmarkd/core/network/supabase_guard.dart';
+import 'package:bookmarkd/core/repositories.dart';
+import 'package:bookmarkd/features/library/domain/rating.dart';
+import 'package:bookmarkd/features/profile/domain/profile.dart';
+import 'package:bookmarkd/features/reviews/domain/review.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
-import '../../../core/network/supabase_guard.dart';
-import '../../../core/repositories.dart';
-import '../../library/domain/rating.dart';
-import '../../profile/domain/profile.dart';
-import '../domain/review.dart';
 
 class SupabaseReviewRepository implements ReviewRepository {
   SupabaseReviewRepository(this._client);
@@ -27,13 +26,15 @@ class SupabaseReviewRepository implements ReviewRepository {
   });
 
   @override
-  Future<List<Review>> byUser(String userId) => guardSupabase(() async {
-    final rows = await _client
+  Future<({List<Review> reviews, int total})> byUser(String userId, {required int limit}) => guardSupabase(() async {
+    final res = await _client
         .from('reviews')
         .select(_select)
         .eq('user_id', userId)
-        .order('created_at', ascending: false);
-    return _withRatings(rows);
+        .order('created_at', ascending: false)
+        .limit(limit)
+        .count(CountOption.exact);
+    return (reviews: await _withRatings(res.data), total: res.count);
   });
 
   @override
@@ -61,7 +62,6 @@ class SupabaseReviewRepository implements ReviewRepository {
   @override
   Future<void> delete(String reviewId) => guardSupabase(() => _client.from('reviews').delete().eq('id', reviewId));
 
-  /// Ratings live on user_books; fetch them for the reviewers in one query.
   Future<List<Review>> _withRatings(List<Map<String, dynamic>> rows) async {
     if (rows.isEmpty) return const [];
     final pairs = rows.map((r) => (r['user_id'] as String, r['book_id'] as String)).toList();

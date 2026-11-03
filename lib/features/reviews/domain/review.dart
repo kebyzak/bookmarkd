@@ -1,7 +1,6 @@
+import 'package:bookmarkd/features/library/domain/rating.dart';
+import 'package:bookmarkd/features/profile/domain/profile.dart';
 import 'package:equatable/equatable.dart';
-
-import '../../library/domain/rating.dart';
-import '../../profile/domain/profile.dart';
 
 class Review extends Equatable {
   const Review({
@@ -22,8 +21,6 @@ class Review extends Equatable {
   final String body;
   final bool containsSpoilers;
   final DateTime createdAt;
-
-  /// The author's rating of the book, if they rated it.
   final Rating? rating;
   final String? bookTitle;
   final String? coverUrl;

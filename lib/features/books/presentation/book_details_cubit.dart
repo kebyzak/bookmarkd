@@ -1,13 +1,15 @@
+import 'dart:async';
+
+import 'package:bookmarkd/core/errors/app_failure.dart';
+import 'package:bookmarkd/core/repositories.dart';
+import 'package:bookmarkd/core/utils/wait_all.dart';
+import 'package:bookmarkd/core/widgets/states.dart';
+import 'package:bookmarkd/features/books/domain/book.dart';
+import 'package:bookmarkd/features/books/domain/book_stats.dart';
+import 'package:bookmarkd/features/library/domain/library_entry.dart';
+import 'package:bookmarkd/features/reviews/domain/review.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
-import '../../../core/errors/app_failure.dart';
-import '../../../core/repositories.dart';
-import '../../../core/utils/wait_all.dart';
-import '../../../core/widgets/states.dart';
-import '../../reviews/domain/review.dart';
-import '../domain/book.dart';
-import '../domain/book_stats.dart';
 
 class BookDetailsState extends Equatable {
   const BookDetailsState({
@@ -28,16 +30,25 @@ class BookDetailsState extends Equatable {
   List<Object?> get props => [status, book, stats, reviews, failure];
 }
 
-/// Resolves a route key to a book, preferring the stored copy so community
-/// stats and reviews can be shown, then loads those.
 class BookDetailsCubit extends Cubit<BookDetailsState> {
-  BookDetailsCubit({required this.bookKey, required this._catalog, required this._books, required this._reviews})
-    : super(const BookDetailsState());
+  BookDetailsCubit({
+    required this.bookKey,
+    required this._catalog,
+    required this._books,
+    required this._reviews,
+    required Stream<LibraryEntry> librarySynced,
+  }) : super(const BookDetailsState()) {
+    _syncedSub = librarySynced.listen((e) {
+      if (e.book.id != null && e.book.id == state.book?.id) refreshCommunity();
+    });
+  }
 
   final String bookKey;
   final CatalogRepository _catalog;
   final BookRepository _books;
   final ReviewRepository _reviews;
+  late final StreamSubscription<LibraryEntry> _syncedSub;
+  int _communityGeneration = 0;
 
   static bool isCatalogKey(String key) => key.contains(':');
 
@@ -60,31 +71,31 @@ class BookDetailsCubit extends Cubit<BookDetailsState> {
     return stored ?? catalogBook;
   }
 
-  /// Stats and reviews are secondary: failures there do not hide the book.
   Future<void> refreshCommunity([Book? book]) async {
     final b = book ?? state.book;
     if (b?.id == null) return;
+    final generation = ++_communityGeneration;
     try {
-      final r = await waitAll([_books.stats(b!.id!), _reviews.forBook(b.id!)]);
-      if (!isClosed) {
+      final stats = _books.stats(b!.id!);
+      final reviews = _reviews.forBook(b.id!);
+      await waitAll([stats, reviews]);
+      if (!isClosed && generation == _communityGeneration) {
         emit(
-          BookDetailsState(
-            status: LoadStatus.success,
-            book: state.book,
-            stats: r[0] as BookStats,
-            reviews: r[1] as List<Review>,
-          ),
+          BookDetailsState(status: LoadStatus.success, book: state.book, stats: await stats, reviews: await reviews),
         );
       }
-    } catch (_) {
-      // Leave the book visible without community data.
-    }
+    } catch (_) {}
   }
 
-  /// Called after the reader adds the book, so later loads use internal ids.
   void bookStored(Book stored) {
     if (state.book?.id == stored.id) return;
     emit(BookDetailsState(status: LoadStatus.success, book: stored, stats: state.stats, reviews: state.reviews));
     refreshCommunity(stored);
+  }
+
+  @override
+  Future<void> close() {
+    _syncedSub.cancel();
+    return super.close();
   }
 }

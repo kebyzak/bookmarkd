@@ -1,24 +1,22 @@
+import 'package:bookmarkd/app/di.dart';
+import 'package:bookmarkd/app/theme/app_theme.dart';
+import 'package:bookmarkd/app/theme/tokens.dart';
+import 'package:bookmarkd/core/errors/app_failure.dart';
+import 'package:bookmarkd/core/repositories.dart';
+import 'package:bookmarkd/core/widgets/common.dart';
+import 'package:bookmarkd/core/widgets/skeleton.dart';
+import 'package:bookmarkd/core/widgets/states.dart';
+import 'package:bookmarkd/features/auth/presentation/session_cubit.dart';
+import 'package:bookmarkd/features/books/domain/book.dart';
+import 'package:bookmarkd/features/books/presentation/widgets/book_list_tile.dart';
+import 'package:bookmarkd/features/library/domain/reading_status.dart';
+import 'package:bookmarkd/features/library/presentation/library_cubit.dart';
+import 'package:bookmarkd/features/profile/domain/profile.dart';
+import 'package:bookmarkd/features/search/presentation/search_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../../app/di.dart';
-import '../../../app/theme/app_theme.dart';
-import '../../../app/theme/tokens.dart';
-import '../../../core/errors/app_failure.dart';
-import '../../../core/repositories.dart';
-import '../../../core/widgets/common.dart';
-import '../../../core/widgets/skeleton.dart';
-import '../../../core/widgets/states.dart';
-import '../../auth/presentation/session_cubit.dart';
-import '../../books/domain/book.dart';
-import '../../books/presentation/widgets/book_list_tile.dart';
-import '../../library/domain/reading_status.dart';
-import '../../library/presentation/library_cubit.dart';
-import '../../profile/domain/profile.dart';
-import '../../search/presentation/search_cubit.dart';
-
-/// Four steps: username (required), photo, goal, first books (optional).
 class OnboardingPage extends StatefulWidget {
   const OnboardingPage({super.key});
 
@@ -60,7 +58,11 @@ class _OnboardingPageState extends State<OnboardingPage> {
   void _advance() {
     FocusScope.of(context).unfocus();
     setState(() => _step++);
-    _pages.animateToPage(_step, duration: Motion.normal, curve: Motion.curve);
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _pages.jumpToPage(_step);
+    } else {
+      _pages.animateToPage(_step, duration: Motion.normal, curve: Motion.curve);
+    }
   }
 
   Future<void> _saveUsername() async {
@@ -219,7 +221,7 @@ class _StepLayout extends StatelessWidget {
         children: [
           Text(title, style: context.text.headlineMedium),
           const SizedBox(height: Space.xs),
-          Text(subtitle, style: context.text.bodyLarge?.copyWith(color: AppColors.textSecondary)),
+          Text(subtitle, style: context.text.bodyLarge?.copyWith(color: context.colors.textSecondary)),
         ],
       ),
     );
@@ -232,10 +234,10 @@ class _StepLayout extends StatelessWidget {
             child: FilledButton(
               onPressed: busy ? null : onPrimary,
               child: busy
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 20,
                       height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: context.colors.onAccent),
                     )
                   : Text(primaryLabel),
             ),
@@ -274,6 +276,7 @@ class _StepLayout extends StatelessWidget {
 
 class _StepDots extends StatelessWidget {
   const _StepDots({required this.step, required this.count});
+
   final int step;
   final int count;
 
@@ -286,11 +289,12 @@ class _StepDots extends StatelessWidget {
         count,
         (i) => AnimatedContainer(
           duration: Motion.normal,
+          curve: Motion.curve,
           margin: const EdgeInsets.symmetric(horizontal: 3),
           width: i == step ? 22 : 8,
           height: 8,
           decoration: BoxDecoration(
-            color: i <= step ? AppColors.accent : AppColors.border,
+            color: i <= step ? context.colors.accent : context.colors.border,
             borderRadius: BorderRadius.circular(4),
           ),
         ),
@@ -301,6 +305,7 @@ class _StepDots extends StatelessWidget {
 
 class _GoalPicker extends StatelessWidget {
   const _GoalPicker({required this.value, required this.onChanged});
+
   final int value;
   final ValueChanged<int> onChanged;
 
@@ -367,7 +372,10 @@ class _FirstBooks extends StatelessWidget {
             if (added > 0)
               Padding(
                 padding: const EdgeInsets.only(top: Space.sm),
-                child: Text('$added on your shelf', style: context.text.labelMedium?.copyWith(color: AppColors.accent)),
+                child: Text(
+                  '$added on your shelf',
+                  style: context.text.labelMedium?.copyWith(color: context.colors.accent),
+                ),
               ),
             Expanded(
               child: switch (search.status) {
@@ -396,6 +404,7 @@ class _FirstBooks extends StatelessWidget {
 
 class _QuickAddTile extends StatelessWidget {
   const _QuickAddTile({required this.book});
+
   final Book book;
 
   @override
@@ -416,7 +425,10 @@ class _QuickAddTile extends StatelessWidget {
       trailing: IconButton(
         tooltip: onShelf ? 'On your shelf' : 'Add to Want to Read',
         onPressed: onShelf ? null : add,
-        icon: Icon(onShelf ? Icons.check_circle_rounded : Icons.add_circle_outline_rounded, color: AppColors.accent),
+        icon: Icon(
+          onShelf ? Icons.check_circle_rounded : Icons.add_circle_outline_rounded,
+          color: context.colors.accent,
+        ),
       ),
     );
   }

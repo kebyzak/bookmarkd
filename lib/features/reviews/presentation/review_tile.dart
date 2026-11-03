@@ -1,15 +1,16 @@
+import 'package:bookmarkd/app/router/app_router.dart';
+import 'package:bookmarkd/app/theme/app_theme.dart';
+import 'package:bookmarkd/app/theme/tokens.dart';
+import 'package:bookmarkd/core/utils/formatters.dart';
+import 'package:bookmarkd/core/widgets/common.dart';
+import 'package:bookmarkd/core/widgets/rating_stars.dart';
+import 'package:bookmarkd/features/reviews/domain/review.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../app/router/app_router.dart';
-import '../../../app/theme/tokens.dart';
-import '../../../core/utils/formatters.dart';
-import '../../../core/widgets/common.dart';
-import '../../../core/widgets/rating_stars.dart';
-import '../domain/review.dart';
-
 class ReviewTile extends StatefulWidget {
   const ReviewTile({super.key, required this.review, this.showBook = false});
+
   final Review review;
   final bool showBook;
 
@@ -62,12 +63,13 @@ class _ReviewTileState extends State<ReviewTile> {
               onTap: () => setState(() => _expanded = !_expanded),
               child: AnimatedSize(
                 duration: Motion.normal,
+                curve: Motion.curve,
                 alignment: Alignment.topCenter,
                 child: Text(
                   r.body,
                   maxLines: _expanded ? null : 5,
                   overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
-                  style: text.bodyMedium,
+                  style: text.bodyLarge?.quote.copyWith(fontSize: 17, height: 1.45),
                 ),
               ),
             ),

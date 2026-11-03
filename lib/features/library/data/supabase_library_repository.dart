@@ -1,14 +1,13 @@
+import 'package:bookmarkd/core/network/row_mappers.dart';
+import 'package:bookmarkd/core/network/supabase_guard.dart';
+import 'package:bookmarkd/core/repositories.dart';
+import 'package:bookmarkd/features/books/domain/book.dart';
+import 'package:bookmarkd/features/library/domain/library_entry.dart';
+import 'package:bookmarkd/features/library/domain/reading_status.dart';
+import 'package:bookmarkd/features/library/domain/status_transition.dart';
+import 'package:bookmarkd/features/reading/domain/progress_update.dart';
+import 'package:bookmarkd/features/reading/domain/reading_session.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
-import '../../../core/network/row_mappers.dart';
-import '../../../core/network/supabase_guard.dart';
-import '../../../core/repositories.dart';
-import '../../books/domain/book.dart';
-import '../../reading/domain/progress_update.dart';
-import '../../reading/domain/reading_session.dart';
-import '../domain/library_entry.dart';
-import '../domain/reading_status.dart';
-import '../domain/status_transition.dart';
 
 class SupabaseLibraryRepository implements LibraryRepository {
   SupabaseLibraryRepository(this._client);
@@ -25,7 +24,6 @@ class SupabaseLibraryRepository implements LibraryRepository {
     return rows.map(entryFromRow).toList();
   });
 
-  /// Upserts on (user_id, book_id): re-adding a work updates the one entry.
   @override
   Future<LibraryEntry> add(Book storedBook, ReadingStatus status) => guardSupabase(() async {
     final userId = _client.auth.currentUser!.id;
@@ -72,7 +70,6 @@ class SupabaseLibraryRepository implements LibraryRepository {
         'p_user_book_id': entryId,
         'p_current_page': update.page,
         'p_progress_percent': update.percent,
-        // The reader's local date (yyyy-MM-dd); the server clock is UTC.
         'p_today': DateTime.now().toIso8601String().substring(0, 10),
       },
     );

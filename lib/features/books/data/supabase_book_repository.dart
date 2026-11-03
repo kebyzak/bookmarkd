@@ -1,22 +1,20 @@
+import 'package:bookmarkd/core/network/row_mappers.dart';
+import 'package:bookmarkd/core/network/supabase_guard.dart';
+import 'package:bookmarkd/core/repositories.dart';
+import 'package:bookmarkd/features/books/domain/book.dart';
+import 'package:bookmarkd/features/books/domain/book_stats.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
-import '../../../core/network/row_mappers.dart';
-import '../../../core/network/supabase_guard.dart';
-import '../../../core/repositories.dart';
-import '../domain/book.dart';
-import '../domain/book_stats.dart';
 
 class SupabaseBookRepository implements BookRepository {
   SupabaseBookRepository(this._client);
 
   final SupabaseClient _client;
 
-  // Named FK: through user_books, books and book_editions are also linked many-to-many (PGRST201).
   static const _select = '*, editions:book_editions!book_editions_book_id_fkey(*)';
 
   @override
   Future<Book> getStoredBook(String bookId) => guardSupabase(() async {
-    final row = await _client.from('books').select(_select).eq('id', bookId).single();
+    final row = await _oneEdition(_client.from('books').select(_select).eq('id', bookId)).single();
     return _fromRow(row);
   });
 
@@ -41,7 +39,6 @@ class SupabaseBookRepository implements BookRepository {
   @override
   Future<Book> save(Book book) => guardSupabase(() async {
     if (book.isStored) return book;
-    // Only ids are sent; the save-book Edge Function fetches trusted metadata itself.
     final res = await _client.functions.invoke(
       'save-book',
       body: {'google_books_id': book.ids.googleBooksId, 'open_library_id': book.ids.openLibraryId},
@@ -74,16 +71,18 @@ class SupabaseBookRepository implements BookRepository {
     return _hydrate(rows.map((r) => (r as Map)['book_id'] as String).toList());
   });
 
-  /// Loads books for ranked ids, preserving rank order.
   Future<List<Book>> _hydrate(List<String> ids) async {
     if (ids.isEmpty) return const [];
-    final rows = await _client.from('books').select(_select).inFilter('id', ids);
+    final rows = await _oneEdition(_client.from('books').select(_select).inFilter('id', ids));
     final byId = {for (final r in rows) r['id'] as String: _fromRow(r)};
     return [
       for (final id in ids)
         if (byId[id] != null) byId[id]!,
     ];
   }
+
+  PostgrestTransformBuilder<PostgrestList> _oneEdition(PostgrestFilterBuilder<PostgrestList> query) =>
+      query.order('created_at', ascending: true, referencedTable: 'editions').limit(1, referencedTable: 'editions');
 
   Book _fromRow(Map<String, dynamic> row) {
     final editions = (row['editions'] as List? ?? const []).cast<Map<String, dynamic>>();

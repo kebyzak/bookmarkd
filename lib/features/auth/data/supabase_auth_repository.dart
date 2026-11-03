@@ -1,7 +1,6 @@
+import 'package:bookmarkd/core/network/supabase_guard.dart';
+import 'package:bookmarkd/core/repositories.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
-import '../../../core/network/supabase_guard.dart';
-import '../../../core/repositories.dart';
 
 class SupabaseAuthRepository implements AuthRepository {
   SupabaseAuthRepository(this._client, {required this.passwordResetRedirect});
@@ -15,9 +14,11 @@ class SupabaseAuthRepository implements AuthRepository {
   String? get currentUserId => _auth.currentUser?.id;
 
   @override
-  Stream<String?> userIdChanges() async* {
+  Stream<String?> userIdChanges() => _userIds().distinct();
+
+  Stream<String?> _userIds() async* {
     yield currentUserId;
-    yield* _auth.onAuthStateChange.map((event) => event.session?.user.id).distinct();
+    yield* _auth.onAuthStateChange.map((event) => event.session?.user.id);
   }
 
   @override

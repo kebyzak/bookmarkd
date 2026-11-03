@@ -1,5 +1,3 @@
-/// A validated progress update: either a page (when the page count is known)
-/// or a percentage (when it is not).
 class ProgressUpdate {
   ProgressUpdate._({required this.percent, this.page});
 
@@ -17,7 +15,6 @@ class ProgressUpdate {
   final int? page;
   final int percent;
 
-  /// Reaching the end only *offers* to finish; status never changes silently.
   bool get isComplete => percent >= 100;
 
   static String? validatePage(int? page, {required int pageCount}) {

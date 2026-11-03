@@ -1,18 +1,15 @@
+import 'package:bookmarkd/core/errors/app_failure.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-
-import '../errors/app_failure.dart';
 
 Dio createHttpClient() => Dio(
   BaseOptions(
     connectTimeout: const Duration(seconds: 8),
     receiveTimeout: const Duration(seconds: 12),
-    // Open Library asks clients to identify themselves; browsers forbid setting User-Agent.
     headers: kIsWeb ? null : {'User-Agent': 'Bookmarkd/1.0 (Flutter; contact: support@bookmarkd.app)'},
   ),
 );
 
-/// Maps a transport error to an [AppFailure].
 AppFailure mapDioError(Object error) {
   if (error is! DioException) return AppFailure.from(error);
   final status = error.response?.statusCode;

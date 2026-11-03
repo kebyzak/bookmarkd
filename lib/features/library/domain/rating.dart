@@ -1,7 +1,5 @@
 import 'package:equatable/equatable.dart';
 
-/// A personal rating from 0.5 to 5 stars in half-star steps.
-/// Stored as integer half stars (1–10); no other value can be constructed.
 class Rating extends Equatable implements Comparable<Rating> {
   Rating.fromHalfStars(this.halfStars) {
     if (halfStars < 1 || halfStars > 10) {

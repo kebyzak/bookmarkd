@@ -10,14 +10,13 @@ enum LibrarySort {
   publicationYear('Publication year');
 
   const LibrarySort(this.label);
+
   final String label;
 }
 
-/// Filter + sort + search over a library. Pure; the page holds one of these.
 class LibraryQuery extends Equatable {
   const LibraryQuery({this.status, this.search = '', this.sort = LibrarySort.dateAdded});
 
-  /// Null means all statuses.
   final ReadingStatus? status;
   final String search;
   final LibrarySort sort;

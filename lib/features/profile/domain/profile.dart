@@ -2,7 +2,6 @@ import 'package:equatable/equatable.dart';
 
 final usernamePattern = RegExp(r'^[a-z0-9_]{3,24}$');
 
-/// Returns an error message, or null when [value] is a valid username.
 String? validateUsername(String? value) {
   final v = value?.trim() ?? '';
   if (v.length < 3) return 'At least 3 characters';
@@ -33,6 +32,7 @@ class Profile extends Equatable {
   final bool onboarded;
 
   String get name => (displayName?.isNotEmpty ?? false) ? displayName! : (username ?? 'Reader');
+
   String get handle => username == null ? '' : '@$username';
 
   Profile copyWith({
@@ -81,6 +81,7 @@ class Profile extends Equatable {
 
 class FollowCounts extends Equatable {
   const FollowCounts({required this.followers, required this.following});
+
   final int followers;
   final int following;
 

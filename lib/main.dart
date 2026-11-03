@@ -9,7 +9,7 @@ import 'core/services/secure_session_storage.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initializeDateFormatting();
+  await initializeDateFormatting('en_US');
   final config = AppConfig.fromEnvironment()..ensureComplete();
 
   await Supabase.initialize(

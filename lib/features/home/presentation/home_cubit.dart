@@ -1,13 +1,12 @@
+import 'package:bookmarkd/core/repositories.dart';
+import 'package:bookmarkd/core/utils/wait_all.dart';
+import 'package:bookmarkd/core/widgets/states.dart';
+import 'package:bookmarkd/features/books/domain/book.dart';
+import 'package:bookmarkd/features/home/domain/recommendation.dart';
+import 'package:bookmarkd/features/library/domain/library_entry.dart';
+import 'package:bookmarkd/features/social/domain/activity.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
-import '../../../core/repositories.dart';
-import '../../../core/utils/wait_all.dart';
-import '../../../core/widgets/states.dart';
-import '../../books/domain/book.dart';
-import '../../library/domain/library_entry.dart';
-import '../../social/domain/activity.dart';
-import '../domain/recommendation.dart';
 
 class HomeState extends Equatable {
   const HomeState({
@@ -20,15 +19,12 @@ class HomeState extends Equatable {
   final LoadStatus status;
   final List<Activity> friends;
   final List<Book> recommended;
-
-  /// The genre the recommendations are based on; null means "popular overall".
   final String? recommendationGenre;
 
   @override
   List<Object?> get props => [status, friends, recommended, recommendationGenre];
 }
 
-/// Social and discovery parts of Home. The reader's own books come from LibraryCubit.
 class HomeCubit extends Cubit<HomeState> {
   HomeCubit(this._activity, this._books) : super(const HomeState());
 
@@ -38,14 +34,13 @@ class HomeCubit extends Cubit<HomeState> {
   Future<void> load({required String myId, required List<LibraryEntry> library}) async {
     final genre = topGenre(library);
     try {
-      final r = await waitAll([
-        _activity.feed(limit: 15),
-        genre == null ? Future.value(const <Book>[]) : _books.popular(category: genre),
-        _books.popular(),
-      ]);
-      final friends = (r[0] as FeedPage).items.where((a) => a.actor.id != myId).take(5).toList();
-      final inGenre = excludeOwned(r[1] as List<Book>, library);
-      final overall = excludeOwned(r[2] as List<Book>, library);
+      final feed = _activity.feed(limit: 15);
+      final genreBooks = genre == null ? Future.value(const <Book>[]) : _books.popular(category: genre);
+      final popular = _books.popular();
+      await waitAll([feed, genreBooks, popular]);
+      final friends = (await feed).items.where((a) => a.actor.id != myId).take(5).toList();
+      final inGenre = excludeOwned(await genreBooks, library);
+      final overall = excludeOwned(await popular, library);
       final useGenre = inGenre.length >= 3;
       if (isClosed) return;
       emit(

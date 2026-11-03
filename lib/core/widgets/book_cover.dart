@@ -1,12 +1,11 @@
+import 'package:bookmarkd/app/theme/app_theme.dart';
+import 'package:bookmarkd/app/theme/tokens.dart';
+import 'package:bookmarkd/features/books/domain/book.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
-import '../../app/theme/tokens.dart';
-import '../../features/books/domain/book.dart';
 import 'skeleton.dart';
 
-/// A 2:3 book cover. Missing or broken images render a typeset placeholder,
-/// never a broken-image icon.
 class BookCover extends StatelessWidget {
   const BookCover({super.key, required this.book, this.width = 96, this.onTap});
 
@@ -32,7 +31,7 @@ class BookCover extends StatelessWidget {
                 fit: BoxFit.cover,
                 memCacheWidth: cacheWidth,
                 fadeInDuration: Motion.normal,
-                placeholder: (_, _) => const SkeletonBox(),
+                placeholder: (_, _) => const Skeleton(child: SkeletonBox()),
                 errorWidget: (_, _, _) => _Placeholder(book: book, width: width),
               ),
       ),
@@ -41,7 +40,7 @@ class BookCover extends StatelessWidget {
     cover = DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: Radii.cover,
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: context.colors.border),
       ),
       position: DecorationPosition.foreground,
       child: cover,
@@ -57,6 +56,7 @@ class BookCover extends StatelessWidget {
 
 class _Placeholder extends StatelessWidget {
   const _Placeholder({required this.book, required this.width});
+
   final Book book;
   final double width;
 
@@ -64,7 +64,7 @@ class _Placeholder extends StatelessWidget {
   Widget build(BuildContext context) {
     final small = width < 72;
     return ColoredBox(
-      color: AppColors.accentSoft,
+      color: coverTone(book.title),
       child: Padding(
         padding: EdgeInsets.all(small ? 6 : 10),
         child: Column(
@@ -77,20 +77,21 @@ class _Placeholder extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 textScaler: TextScaler.noScaling,
                 style: TextStyle(
-                  fontSize: small ? 9 : 13,
-                  fontWeight: FontWeight.w700,
+                  fontFamily: AppTheme.serif,
+                  fontSize: small ? 10 : 14,
+                  fontWeight: FontWeight.w500,
                   height: 1.15,
-                  color: AppColors.accent,
+                  color: onCoverTone,
                 ),
               ),
             ),
             if (!small)
               Text(
-                book.authorLine,
+                book.authorLine.toUpperCase(),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 textScaler: TextScaler.noScaling,
-                style: const TextStyle(fontSize: 10, color: AppColors.accent),
+                style: const TextStyle(fontSize: 8, letterSpacing: 0.8, color: onCoverTone),
               ),
           ],
         ),
@@ -99,9 +100,9 @@ class _Placeholder extends StatelessWidget {
   }
 }
 
-/// Scales down slightly while pressed — the micro-interaction used for covers and cards.
 class _Pressable extends StatefulWidget {
   const _Pressable({required this.onTap, required this.child});
+
   final VoidCallback onTap;
   final Widget child;
 
@@ -118,11 +119,15 @@ class _PressableState extends State<_Pressable> {
     onTapCancel: () => setState(() => _down = false),
     onTapUp: (_) => setState(() => _down = false),
     onTap: widget.onTap,
-    child: AnimatedScale(scale: _down ? 0.96 : 1, duration: Motion.fast, curve: Motion.curve, child: widget.child),
+    child: AnimatedScale(
+      scale: _down && !MediaQuery.disableAnimationsOf(context) ? 0.96 : 1,
+      duration: _down ? const Duration(milliseconds: 100) : Motion.normal,
+      curve: Motion.curve,
+      child: widget.child,
+    ),
   );
 }
 
-/// Cover with title and author underneath, used in carousels and grids.
 class BookTile extends StatelessWidget {
   const BookTile({super.key, required this.book, required this.width, this.onTap, this.caption});
 
@@ -141,7 +146,7 @@ class BookTile extends StatelessWidget {
         children: [
           BookCover(book: book, width: width, onTap: onTap),
           const SizedBox(height: Space.xs),
-          Text(book.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: text.titleSmall),
+          Text(book.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: text.titleSmall?.serif),
           const SizedBox(height: 2),
           Text(book.authorLine, maxLines: 1, overflow: TextOverflow.ellipsis, style: text.bodySmall),
           if (caption != null) ...[const SizedBox(height: Space.xxs), caption!],

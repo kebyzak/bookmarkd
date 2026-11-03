@@ -1,8 +1,6 @@
-import '../../books/domain/book.dart';
-import '../../library/domain/library_entry.dart';
+import 'package:bookmarkd/features/books/domain/book.dart';
+import 'package:bookmarkd/features/library/domain/library_entry.dart';
 
-/// MVP heuristic (see docs/ARCHITECTURE.md §7): "popular in your most-read genre".
-/// Ties go to the genre seen first.
 String? topGenre(Iterable<LibraryEntry> entries) {
   final counts = <String, int>{};
   for (final e in entries) {

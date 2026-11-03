@@ -1,28 +1,27 @@
+import 'dart:async';
+
+import 'package:bookmarkd/core/errors/app_failure.dart';
+import 'package:bookmarkd/core/repositories.dart';
+import 'package:bookmarkd/core/widgets/states.dart';
+import 'package:bookmarkd/features/books/domain/book.dart';
+import 'package:bookmarkd/features/library/domain/library_entry.dart';
+import 'package:bookmarkd/features/library/domain/rating.dart';
+import 'package:bookmarkd/features/library/domain/reading_status.dart';
+import 'package:bookmarkd/features/library/domain/status_transition.dart';
+import 'package:bookmarkd/features/reading/domain/progress_update.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../core/errors/app_failure.dart';
-import '../../../core/repositories.dart';
-import '../../../core/widgets/states.dart';
-import '../../books/domain/book.dart';
-import '../../reading/domain/progress_update.dart';
-import '../domain/library_entry.dart';
-import '../domain/rating.dart';
-import '../domain/reading_status.dart';
-import '../domain/status_transition.dart';
-
 class LibraryState extends Equatable {
-  const LibraryState({this.status = LoadStatus.initial, this.byId = const {}, this.failure});
+  const LibraryState({this.status = LoadStatus.initial, this.byId = const {}, this.adding = const {}, this.failure});
 
   final LoadStatus status;
-
-  /// Entries keyed by entry id.
   final Map<String, LibraryEntry> byId;
+  final Set<String> adding;
   final AppFailure? failure;
 
   List<LibraryEntry> get entries => byId.values.toList();
 
-  /// Finds the entry for a stored or catalog book (matched by work id or external ids).
   LibraryEntry? entryFor(Book book) {
     bool same(String? a, String? b) => a != null && a == b;
     for (final e in byId.values) {
@@ -37,19 +36,22 @@ class LibraryState extends Equatable {
     return null;
   }
 
-  LibraryState copyWith({LoadStatus? status, Map<String, LibraryEntry>? byId, AppFailure? Function()? failure}) =>
-      LibraryState(
-        status: status ?? this.status,
-        byId: byId ?? this.byId,
-        failure: failure != null ? failure() : this.failure,
-      );
+  LibraryState copyWith({
+    LoadStatus? status,
+    Map<String, LibraryEntry>? byId,
+    Set<String>? adding,
+    AppFailure? Function()? failure,
+  }) => LibraryState(
+    status: status ?? this.status,
+    byId: byId ?? this.byId,
+    adding: adding ?? this.adding,
+    failure: failure != null ? failure() : this.failure,
+  );
 
   @override
-  List<Object?> get props => [status, byId, failure];
+  List<Object?> get props => [status, byId, adding, failure];
 }
 
-/// The signed-in reader's library. The single writer for library state:
-/// every screen reads it from here, so all tabs stay in sync.
 class LibraryCubit extends Cubit<LibraryState> {
   LibraryCubit(this._library, this._books, {DateTime Function()? clock})
     : _clock = clock ?? DateTime.now,
@@ -61,13 +63,16 @@ class LibraryCubit extends Cubit<LibraryState> {
   String? _userId;
 
   Future<void> load(String userId) async {
+    final refreshing = userId == _userId && state.status == LoadStatus.success;
     _userId = userId;
-    emit(state.copyWith(status: LoadStatus.loading, failure: () => null));
+    if (!refreshing) emit(state.copyWith(status: LoadStatus.loading, failure: () => null));
     try {
       final entries = await _library.getLibrary(userId);
-      emit(LibraryState(status: LoadStatus.success, byId: {for (final e in entries) e.id: e}));
+      emit(LibraryState(status: LoadStatus.success, byId: {for (final e in entries) e.id: e}, adding: state.adding));
     } catch (e) {
-      emit(state.copyWith(status: LoadStatus.failure, failure: () => AppFailure.from(e)));
+      final failure = AppFailure.from(e);
+      if (refreshing) throw failure;
+      emit(state.copyWith(status: LoadStatus.failure, failure: () => failure));
     }
   }
 
@@ -80,15 +85,29 @@ class LibraryCubit extends Cubit<LibraryState> {
     emit(const LibraryState());
   }
 
-  /// Not optimistic: the book needs server ids first.
   Future<LibraryEntry> add(Book book, ReadingStatus status) async {
     final existing = state.entryFor(book);
     if (existing != null) {
       await setStatus(existing, status);
       return state.byId[existing.id]!;
     }
-    final stored = await _guard(() => _books.save(book));
-    final entry = await _guard(() => _library.add(stored, status));
+    final key = book.key;
+    final pending = _adding[key];
+    if (pending != null) return pending;
+    final future = _insert(book, status).whenComplete(() {
+      _adding.remove(key);
+      if (!isClosed) emit(state.copyWith(adding: _adding.keys.toSet()));
+    });
+    _adding[key] = future;
+    emit(state.copyWith(adding: _adding.keys.toSet()));
+    return future;
+  }
+
+  final _adding = <String, Future<LibraryEntry>>{};
+
+  Future<LibraryEntry> _insert(Book book, ReadingStatus status) async {
+    final stored = await _books.save(book);
+    final entry = await _library.add(stored, status);
     _put(entry);
     return entry;
   }
@@ -107,7 +126,7 @@ class LibraryCubit extends Cubit<LibraryState> {
     final previous = state.byId[entry.id];
     _put(entry.copyWith(currentPage: () => update.page ?? entry.currentPage, progressPercent: () => update.percent));
     try {
-      final saved = await _guard(() => _library.logProgress(entry.id, update));
+      final saved = await _library.logProgress(entry.id, update);
       _put(saved);
       return saved;
     } catch (_) {
@@ -120,35 +139,49 @@ class LibraryCubit extends Cubit<LibraryState> {
     final previous = state.byId[entry.id];
     emit(state.copyWith(byId: Map.of(state.byId)..remove(entry.id)));
     try {
-      await _guard(() => _library.remove(entry.id));
+      await _library.remove(entry.id);
+      if (!_synced.isClosed) _synced.add(entry);
     } catch (_) {
       if (previous != null) _put(previous);
       rethrow;
     }
   }
 
-  /// Applies [next] now, persists it, and rolls back if persisting fails.
+  Stream<LibraryEntry> get synced => _synced.stream;
+  final _synced = StreamController<LibraryEntry>.broadcast();
+
+  final _writes = <String, Future<void>>{};
+  final _latest = <String, int>{};
+
   Future<void> _optimistic(LibraryEntry next) async {
-    final previous = state.byId[next.id];
+    final id = next.id;
+    final previous = state.byId[id];
+    final seq = _latest[id] = (_latest[id] ?? 0) + 1;
     _put(next);
+    final write = (_writes[id] ?? Future<void>.value()).catchError((Object _) {}).then((_) => _library.update(next));
+    _writes[id] = write;
     try {
-      _put(await _guard(() => _library.update(next)));
+      final saved = await write;
+      if (_latest[id] != seq) return;
+      _put(saved);
+      if (!_synced.isClosed) _synced.add(saved);
     } catch (_) {
+      if (_latest[id] != seq) return;
       if (previous != null) _put(previous);
       rethrow;
+    } finally {
+      if (_latest[id] == seq) _writes.remove(id);
     }
+  }
+
+  @override
+  Future<void> close() {
+    _synced.close();
+    return super.close();
   }
 
   void _put(LibraryEntry entry) {
     if (isClosed) return;
     emit(state.copyWith(byId: {...state.byId, entry.id: entry}));
-  }
-
-  Future<T> _guard<T>(Future<T> Function() call) async {
-    try {
-      return await call();
-    } catch (e) {
-      throw AppFailure.from(e);
-    }
   }
 }

@@ -1,15 +1,15 @@
 import 'dart:math' as math;
 
+import 'package:bookmarkd/app/theme/app_theme.dart';
+import 'package:bookmarkd/app/theme/tokens.dart';
+import 'package:bookmarkd/core/utils/formatters.dart';
+import 'package:bookmarkd/core/widgets/common.dart';
+import 'package:bookmarkd/features/statistics/domain/reading_stats.dart';
 import 'package:flutter/material.dart';
 
-import '../../../app/theme/tokens.dart';
-import '../../../core/utils/formatters.dart';
-import '../../../core/widgets/common.dart';
-import '../domain/reading_stats.dart';
-
-/// Circular annual goal indicator.
 class GoalRing extends StatelessWidget {
   const GoalRing({super.key, required this.stats, this.size = 64});
+
   final ReadingStats stats;
   final double size;
 
@@ -25,14 +25,14 @@ class GoalRing extends StatelessWidget {
           dimension: size,
           child: TweenAnimationBuilder<double>(
             tween: Tween(end: progress),
-            duration: const Duration(milliseconds: 700),
+            duration: Motion.normal,
             curve: Motion.curve,
             builder: (_, v, _) => CustomPaint(
-              painter: _RingPainter(v),
+              painter: _RingPainter(v, track: context.colors.accentSoft, fill: context.colors.accent),
               child: Center(
                 child: Text(
                   '${stats.finishedThisYear}',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppColors.accent),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(color: context.colors.accent),
                 ),
               ),
             ),
@@ -44,8 +44,11 @@ class GoalRing extends StatelessWidget {
 }
 
 class _RingPainter extends CustomPainter {
-  _RingPainter(this.progress);
+  _RingPainter(this.progress, {required this.track, required this.fill});
+
   final double progress;
+  final Color track;
+  final Color fill;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -56,19 +59,19 @@ class _RingPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = stroke
       ..strokeCap = StrokeCap.round;
-    canvas.drawArc(arc, 0, math.pi * 2, false, paint..color = AppColors.accentSoft);
+    canvas.drawArc(arc, 0, math.pi * 2, false, paint..color = track);
     if (progress > 0) {
-      canvas.drawArc(arc, -math.pi / 2, math.pi * 2 * progress, false, paint..color = AppColors.accent);
+      canvas.drawArc(arc, -math.pi / 2, math.pi * 2 * progress, false, paint..color = fill);
     }
   }
 
   @override
-  bool shouldRepaint(_RingPainter old) => old.progress != progress;
+  bool shouldRepaint(_RingPainter old) => old.progress != progress || old.track != track || old.fill != fill;
 }
 
-/// Goal card used on Home and Profile.
 class GoalCard extends StatelessWidget {
   const GoalCard({super.key, required this.stats, this.onSetGoal});
+
   final ReadingStats stats;
   final VoidCallback? onSetGoal;
 
@@ -94,13 +97,13 @@ class GoalCard extends StatelessWidget {
                       : stats.finishedThisYear >= stats.goal!
                       ? 'Goal reached — ${stats.finishedThisYear} books!'
                       : '${stats.finishedThisYear} of ${stats.goal} books · ${stats.goal! - stats.finishedThisYear} to go',
-                  style: text.bodyMedium?.copyWith(color: AppColors.textSecondary),
+                  style: text.bodyMedium?.copyWith(color: context.colors.textSecondary),
                 ),
               ],
             ),
           ),
           if (stats.goal == null && onSetGoal != null)
-            const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
+            Icon(Icons.chevron_right_rounded, color: context.colors.textSecondary),
         ],
       ),
     );
@@ -109,6 +112,7 @@ class GoalCard extends StatelessWidget {
 
 class StatsGrid extends StatelessWidget {
   const StatsGrid({super.key, required this.stats});
+
   final ReadingStats stats;
 
   @override

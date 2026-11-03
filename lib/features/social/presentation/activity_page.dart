@@ -1,14 +1,14 @@
+import 'package:bookmarkd/app/di.dart';
+import 'package:bookmarkd/app/theme/app_theme.dart';
+import 'package:bookmarkd/app/theme/tokens.dart';
+import 'package:bookmarkd/core/errors/app_failure.dart';
+import 'package:bookmarkd/core/widgets/skeleton.dart';
+import 'package:bookmarkd/core/widgets/states.dart';
+import 'package:bookmarkd/features/social/domain/activity.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../app/di.dart';
-import '../../../app/theme/app_theme.dart';
-import '../../../app/theme/tokens.dart';
-import '../../../core/errors/app_failure.dart';
-import '../../../core/widgets/skeleton.dart';
-import '../../../core/widgets/states.dart';
-import '../domain/activity.dart';
 import 'activity_card.dart';
 import 'feed_cubit.dart';
 
@@ -48,6 +48,7 @@ class _ActivityView extends StatelessWidget {
     );
 
     return Scaffold(
+      appBar: AppBar(),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: cubit.refresh,
@@ -85,7 +86,7 @@ class _ActivityView extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
                       sliver: SliverList.separated(
                         itemCount: state.items.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: Space.sm),
+                        separatorBuilder: (_, _) => const Divider(),
                         itemBuilder: (_, i) => ActivityCard(
                           key: ValueKey(state.items[i].id),
                           activity: state.items[i],
@@ -99,6 +100,12 @@ class _ActivityView extends StatelessWidget {
                         child: Center(
                           child: state.loadingMore
                               ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))
+                              : state.loadMoreFailed
+                              ? TextButton.icon(
+                                  onPressed: () => cubit.loadMore(retry: true),
+                                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                                  label: const Text("Couldn't load more · Retry"),
+                                )
                               : state.hasMore
                               ? const SizedBox.shrink()
                               : Text("You're all caught up", style: context.text.bodySmall),

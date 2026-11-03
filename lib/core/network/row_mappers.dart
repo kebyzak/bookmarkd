@@ -1,11 +1,8 @@
-import '../../features/books/domain/book.dart';
-import '../../features/library/domain/library_entry.dart';
-import '../../features/library/domain/rating.dart';
-import '../../features/library/domain/reading_status.dart';
+import 'package:bookmarkd/features/books/domain/book.dart';
+import 'package:bookmarkd/features/library/domain/library_entry.dart';
+import 'package:bookmarkd/features/library/domain/rating.dart';
+import 'package:bookmarkd/features/library/domain/reading_status.dart';
 
-/// Shared mappers from Supabase rows to domain models.
-
-/// Combines a `books` row with one of its `book_editions` rows.
 Book bookFromRows(Map<String, dynamic> work, Map<String, dynamic>? edition) => Book(
   id: work['id'] as String,
   editionId: edition?['id'] as String?,
@@ -22,8 +19,6 @@ Book bookFromRows(Map<String, dynamic> work, Map<String, dynamic>? edition) => B
   language: edition?['language'] as String?,
 );
 
-// Constraint names pick the FK: user_books also has a composite (edition_id, book_id) FK,
-// which makes a bare book_editions embed ambiguous (PostgREST PGRST201).
 const userBookSelect = '*, book:books!user_books_book_id_fkey(*), edition:book_editions!user_books_edition_id_fkey(*)';
 
 LibraryEntry entryFromRow(Map<String, dynamic> row) => LibraryEntry(

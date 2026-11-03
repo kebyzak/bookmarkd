@@ -1,8 +1,7 @@
+import 'package:bookmarkd/features/books/domain/book.dart';
+import 'package:bookmarkd/features/library/domain/rating.dart';
+import 'package:bookmarkd/features/profile/domain/profile.dart';
 import 'package:equatable/equatable.dart';
-
-import '../../books/domain/book.dart';
-import '../../library/domain/rating.dart';
-import '../../profile/domain/profile.dart';
 
 enum ActivityType {
   wantToRead('want_to_read', 'wants to read'),
@@ -13,6 +12,7 @@ enum ActivityType {
   reviewed('reviewed', 'reviewed');
 
   const ActivityType(this.dbValue, this.verb);
+
   final String dbValue;
   final String verb;
 
@@ -58,9 +58,9 @@ class Activity extends Equatable {
   List<Object?> get props => [id, type, actor, book, createdAt, rating, reviewExcerpt, likeCount, likedByMe];
 }
 
-/// Keyset pagination cursor: the last item seen.
 class FeedCursor extends Equatable {
   const FeedCursor(this.createdAt, this.id);
+
   final DateTime createdAt;
   final String id;
 
@@ -70,8 +70,8 @@ class FeedCursor extends Equatable {
 
 class FeedPage {
   const FeedPage(this.items, this.next);
+
   final List<Activity> items;
 
-  /// Null when there are no more pages.
   final FeedCursor? next;
 }

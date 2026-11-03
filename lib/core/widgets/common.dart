@@ -1,13 +1,15 @@
+import 'package:bookmarkd/app/theme/app_theme.dart';
+import 'package:bookmarkd/app/theme/tokens.dart';
+import 'package:bookmarkd/features/books/domain/book.dart';
+import 'package:bookmarkd/features/profile/domain/profile.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
-import '../../app/theme/tokens.dart';
-import '../../features/books/domain/book.dart';
-import '../../features/profile/domain/profile.dart';
 import 'book_cover.dart';
 
 class AppAvatar extends StatelessWidget {
   const AppAvatar({super.key, required this.profile, this.size = 40});
+
   final Profile profile;
   final double size;
 
@@ -20,11 +22,11 @@ class AppAvatar extends StatelessWidget {
       image: true,
       child: CircleAvatar(
         radius: size / 2,
-        backgroundColor: AppColors.accentSoft,
+        backgroundColor: context.colors.accentSoft,
         foregroundImage: url == null ? null : CachedNetworkImageProvider(url),
         child: Text(
           initial,
-          style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.w700, fontSize: size * 0.4),
+          style: TextStyle(color: context.colors.accent, fontWeight: FontWeight.w700, fontSize: size * 0.4),
         ),
       ),
     );
@@ -74,7 +76,6 @@ class BookCarousel extends StatelessWidget {
   Widget build(BuildContext context) {
     final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6);
     return SizedBox(
-      // gap + two title lines + author line, scaled with the reader's text size
       height: coverWidth / coverAspectRatio + 72 * scale,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
@@ -90,6 +91,7 @@ class BookCarousel extends StatelessWidget {
 
 class AppProgressBar extends StatelessWidget {
   const AppProgressBar({super.key, required this.value, this.height = 6});
+
   final double value;
   final double height;
 
@@ -105,9 +107,9 @@ class AppProgressBar extends StatelessWidget {
   );
 }
 
-/// White bordered container — the base card in the design system.
 class SurfaceCard extends StatelessWidget {
   const SurfaceCard({super.key, required this.child, this.padding = const EdgeInsets.all(Space.md), this.onTap});
+
   final Widget child;
   final EdgeInsets padding;
   final VoidCallback? onTap;

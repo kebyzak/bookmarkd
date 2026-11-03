@@ -1,14 +1,14 @@
 import 'dart:async';
 
+import 'package:bookmarkd/core/errors/app_failure.dart';
+import 'package:bookmarkd/core/repositories.dart';
+import 'package:bookmarkd/features/profile/domain/profile.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../core/errors/app_failure.dart';
-import '../../../core/repositories.dart';
-import '../../profile/domain/profile.dart';
-
 sealed class SessionState extends Equatable {
   const SessionState();
+
   @override
   List<Object?> get props => [];
 }
@@ -23,9 +23,9 @@ class SignedOut extends SessionState {
 
 class SignedIn extends SessionState {
   const SignedIn(this.profile, {this.recoveringPassword = false});
+
   final Profile profile;
 
-  /// Opened a password-reset link: must choose a new password before anything else.
   final bool recoveringPassword;
 
   bool get needsOnboarding => !profile.onboarded;
@@ -34,9 +34,9 @@ class SignedIn extends SessionState {
   List<Object?> get props => [profile, recoveringPassword];
 }
 
-/// Signed in, but the profile could not be loaded.
 class SessionFailure extends SessionState {
   const SessionFailure(this.userId, this.message);
+
   final String userId;
   final String message;
 
@@ -44,7 +44,6 @@ class SessionFailure extends SessionState {
   List<Object?> get props => [userId, message];
 }
 
-/// Owns "who is signed in" for the whole app.
 class SessionCubit extends Cubit<SessionState> {
   SessionCubit(this._auth, this._profiles) : super(const SessionUnknown()) {
     _sub = _auth.userIdChanges().listen(_onUser);
@@ -59,7 +58,6 @@ class SessionCubit extends Cubit<SessionState> {
   late final StreamSubscription<String?> _sub;
   late final StreamSubscription<void> _recoverySub;
 
-  /// The recovery event can arrive before the profile has loaded.
   bool _recovering = false;
 
   Profile? get profile => switch (state) {
@@ -71,7 +69,6 @@ class SessionCubit extends Cubit<SessionState> {
     if (userId == null) return emit(const SignedOut());
     try {
       final profile = await _profiles.getProfile(userId);
-      // Signed out (or switched user) while loading: this result is stale.
       if (isClosed || _auth.currentUserId != userId) return;
       emit(SignedIn(profile, recoveringPassword: _recovering));
     } catch (e) {

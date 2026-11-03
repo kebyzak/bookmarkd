@@ -1,8 +1,7 @@
-import '../../features/auth/presentation/session_cubit.dart';
+import 'package:bookmarkd/features/auth/presentation/session_cubit.dart';
 
 const authRoutes = {'/welcome', '/login', '/register', '/forgot-password'};
 
-/// The one place that decides where a session may be. Pure.
 String? redirectFor(SessionState session, String location) {
   final onAuth = authRoutes.contains(location);
   return switch (session) {

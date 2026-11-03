@@ -1,13 +1,12 @@
+import 'package:bookmarkd/core/errors/app_failure.dart';
+import 'package:bookmarkd/core/repositories.dart';
+import 'package:bookmarkd/core/utils/wait_all.dart';
+import 'package:bookmarkd/core/widgets/states.dart';
+import 'package:bookmarkd/features/library/domain/library_entry.dart';
+import 'package:bookmarkd/features/profile/domain/profile.dart';
+import 'package:bookmarkd/features/reviews/domain/review.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
-import '../../../core/errors/app_failure.dart';
-import '../../../core/repositories.dart';
-import '../../../core/utils/wait_all.dart';
-import '../../../core/widgets/states.dart';
-import '../../library/domain/library_entry.dart';
-import '../../reviews/domain/review.dart';
-import '../domain/profile.dart';
 
 class ProfileState extends Equatable {
   const ProfileState({
@@ -17,6 +16,7 @@ class ProfileState extends Equatable {
     this.isFollowing = false,
     this.entries = const [],
     this.reviews = const [],
+    this.reviewCount = 0,
     this.failure,
   });
 
@@ -24,10 +24,9 @@ class ProfileState extends Equatable {
   final Profile? profile;
   final FollowCounts counts;
   final bool isFollowing;
-
-  /// Another reader's library. For the signed-in reader, use LibraryCubit.
   final List<LibraryEntry> entries;
   final List<Review> reviews;
+  final int reviewCount;
   final AppFailure? failure;
 
   ProfileState copyWith({
@@ -37,6 +36,7 @@ class ProfileState extends Equatable {
     bool? isFollowing,
     List<LibraryEntry>? entries,
     List<Review>? reviews,
+    int? reviewCount,
     AppFailure? failure,
   }) => ProfileState(
     status: status ?? this.status,
@@ -45,11 +45,12 @@ class ProfileState extends Equatable {
     isFollowing: isFollowing ?? this.isFollowing,
     entries: entries ?? this.entries,
     reviews: reviews ?? this.reviews,
+    reviewCount: reviewCount ?? this.reviewCount,
     failure: failure ?? this.failure,
   );
 
   @override
-  List<Object?> get props => [status, profile, counts, isFollowing, entries, reviews, failure];
+  List<Object?> get props => [status, profile, counts, isFollowing, entries, reviews, reviewCount, failure];
 }
 
 class ProfileCubit extends Cubit<ProfileState> {
@@ -69,24 +70,27 @@ class ProfileCubit extends Cubit<ProfileState> {
   final LibraryRepository _library;
   final ReviewRepository _reviews;
 
+  static const shownReviews = 5;
+
   Future<void> load() async {
     try {
-      final r = await waitAll([
-        _profiles.getProfile(userId),
-        _social.followCounts(userId),
-        isSelf ? Future.value(false) : _social.isFollowing(userId),
-        isSelf ? Future.value(const <LibraryEntry>[]) : _library.getLibrary(userId),
-        _reviews.byUser(userId),
-      ]);
+      final profile = _profiles.getProfile(userId);
+      final counts = _social.followCounts(userId);
+      final following = isSelf ? Future.value(false) : _social.isFollowing(userId);
+      final entries = isSelf ? Future.value(const <LibraryEntry>[]) : _library.getLibrary(userId);
+      final reviews = _reviews.byUser(userId, limit: shownReviews);
+      await waitAll([profile, counts, following, entries, reviews]);
       if (isClosed) return;
+      final (reviews: shown, :total) = await reviews;
       emit(
         ProfileState(
           status: LoadStatus.success,
-          profile: r[0] as Profile,
-          counts: r[1] as FollowCounts,
-          isFollowing: r[2] as bool,
-          entries: r[3] as List<LibraryEntry>,
-          reviews: r[4] as List<Review>,
+          profile: await profile,
+          counts: await counts,
+          isFollowing: await following,
+          entries: await entries,
+          reviews: shown,
+          reviewCount: total,
         ),
       );
     } catch (e) {
@@ -94,7 +98,6 @@ class ProfileCubit extends Cubit<ProfileState> {
     }
   }
 
-  /// Optimistic; rolls back and rethrows on failure.
   Future<void> toggleFollow() async {
     final before = state;
     final following = !state.isFollowing;
@@ -109,9 +112,9 @@ class ProfileCubit extends Cubit<ProfileState> {
     );
     try {
       following ? await _social.follow(userId) : await _social.unfollow(userId);
-    } catch (e) {
+    } catch (_) {
       if (!isClosed) emit(before);
-      throw AppFailure.from(e);
+      rethrow;
     }
   }
 

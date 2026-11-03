@@ -1,7 +1,4 @@
-import '../domain/book.dart';
-
-/// Pure mappers from external catalog JSON to [Book]. Outside data is parsed
-/// here, once; nothing else in the app reads raw API JSON.
+import 'package:bookmarkd/features/books/domain/book.dart';
 
 Book parseGoogleVolume(Map<String, dynamic> json) {
   final info = (json['volumeInfo'] as Map?)?.cast<String, dynamic>() ?? const {};
@@ -55,8 +52,6 @@ Book parseOpenLibraryDoc(Map<String, dynamic> json) {
   );
 }
 
-/// Removes repeated editions from a result list, keeping first occurrences.
-/// Different editions are only merged when they share an external id or ISBN.
 List<Book> dedupeBooks(Iterable<Book> books) {
   final seen = <String>{};
   final result = <Book>[];

@@ -1,10 +1,8 @@
 import 'dart:convert';
 
+import 'package:bookmarkd/features/books/domain/book.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../features/books/domain/book.dart';
-
-/// Books the reader recently opened from search. Lightweight, local only.
 class RecentSearchesStore {
   RecentSearchesStore(this._prefs);
 
@@ -17,7 +15,6 @@ class RecentSearchesStore {
       final raw = await _prefs.getStringList(_key) ?? const [];
       return raw.map((s) => Book.fromJson(jsonDecode(s) as Map<String, dynamic>)).toList();
     } catch (_) {
-      // Corrupt or old-format cache: start over rather than crash.
       await _prefs.remove(_key);
       return const [];
     }

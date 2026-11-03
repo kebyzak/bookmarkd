@@ -1,5 +1,5 @@
-import '../../library/domain/library_entry.dart';
-import '../../library/domain/reading_status.dart';
+import 'package:bookmarkd/features/library/domain/library_entry.dart';
+import 'package:bookmarkd/features/library/domain/reading_status.dart';
 
 class ReadingStats {
   const ReadingStats({
@@ -27,8 +27,6 @@ class ReadingStats {
 
   final int finishedThisYear;
   final int totalFinished;
-
-  /// Sum of page counts of finished books whose page count is known.
   final int pagesRead;
   final int booksWithPageCount;
   final double? averageRating;

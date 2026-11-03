@@ -1,17 +1,19 @@
+import 'package:bookmarkd/app/router/app_router.dart';
+import 'package:bookmarkd/app/theme/app_theme.dart';
+import 'package:bookmarkd/app/theme/tokens.dart';
+import 'package:bookmarkd/core/errors/app_failure.dart';
+import 'package:bookmarkd/core/widgets/book_cover.dart';
+import 'package:bookmarkd/core/widgets/rating_stars.dart';
+import 'package:bookmarkd/core/widgets/states.dart';
+import 'package:bookmarkd/features/books/domain/book.dart';
+import 'package:bookmarkd/features/library/domain/library_entry.dart';
+import 'package:bookmarkd/features/library/domain/reading_status.dart';
+import 'package:bookmarkd/features/reading/presentation/finish_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../app/router/app_router.dart';
-import '../../../app/theme/tokens.dart';
-import '../../../core/errors/app_failure.dart';
-import '../../../core/widgets/book_cover.dart';
-import '../../../core/widgets/rating_stars.dart';
-import '../../../core/widgets/states.dart';
-import '../../books/domain/book.dart';
-import '../domain/library_entry.dart';
-import '../domain/reading_status.dart';
 import 'library_cubit.dart';
 
 const statusIcons = {
@@ -21,8 +23,6 @@ const statusIcons = {
   ReadingStatus.dnf: Icons.do_not_disturb_on_outlined,
 };
 
-/// Opens the shelf actions for [book]: choose a status, rate, favorite,
-/// update progress, review, or remove.
 Future<void> showLibrarySheet(BuildContext context, Book book) => showModalBottomSheet<void>(
   context: context,
   isScrollControlled: true,
@@ -35,16 +35,16 @@ Future<void> showLibrarySheet(BuildContext context, Book book) => showModalBotto
 
 class _LibrarySheet extends StatelessWidget {
   const _LibrarySheet({required this.book, required this.parent});
-  final Book book;
 
-  /// Context below the sheet, for navigation and messages after it closes.
+  final Book book;
   final BuildContext parent;
 
-  Future<void> _run(BuildContext context, Future<void> Function() action, {bool close = false}) async {
+  Future<void> _run(BuildContext context, Future<void> Function() action, {bool close = false, String? done}) async {
     HapticFeedback.lightImpact();
     if (close) Navigator.of(context).pop();
     try {
       await action();
+      if (done != null && parent.mounted) showMessage(parent, done);
     } catch (e) {
       if (parent.mounted) showMessage(parent, AppFailure.from(e).message);
     }
@@ -69,7 +69,7 @@ class _LibrarySheet extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(book.title, style: text.titleMedium, maxLines: 2, overflow: TextOverflow.ellipsis),
+                    Text(book.title, style: text.titleMedium?.serif, maxLines: 2, overflow: TextOverflow.ellipsis),
                     Text(book.authorLine, style: text.bodySmall, maxLines: 1),
                   ],
                 ),
@@ -80,7 +80,7 @@ class _LibrarySheet extends StatelessWidget {
                   onPressed: () => _run(context, () => cubit.toggleFavorite(entry)),
                   icon: Icon(
                     entry.isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                    color: entry.isFavorite ? AppColors.danger : AppColors.textSecondary,
+                    color: entry.isFavorite ? context.colors.danger : context.colors.textSecondary,
                   ),
                 ),
             ],
@@ -90,11 +90,19 @@ class _LibrarySheet extends StatelessWidget {
             _StatusOption(
               status: status,
               selected: entry?.status == status,
-              onTap: () => _run(
-                context,
-                () => entry == null ? cubit.add(book, status) : cubit.setStatus(entry, status),
-                close: entry == null,
-              ),
+              onTap: () {
+                if (entry != null && status == ReadingStatus.finished) {
+                  Navigator.of(context).pop();
+                  showFinishSheet(parent, entry);
+                  return;
+                }
+                _run(
+                  context,
+                  () => entry == null ? cubit.add(book, status) : cubit.setStatus(entry, status),
+                  close: entry == null,
+                  done: entry == null ? 'Added to ${status.label}' : null,
+                );
+              },
             ),
           if (entry != null) ...[
             const SizedBox(height: Space.md),
@@ -133,7 +141,7 @@ class _LibrarySheet extends StatelessWidget {
             ),
             const SizedBox(height: Space.xs),
             TextButton.icon(
-              style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+              style: TextButton.styleFrom(foregroundColor: context.colors.danger),
               onPressed: () => _confirmRemove(context, entry),
               icon: const Icon(Icons.delete_outline_rounded, size: 18),
               label: const Text('Remove from library'),
@@ -154,19 +162,22 @@ class _LibrarySheet extends StatelessWidget {
         actions: [
           TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
           TextButton(
-            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            style: TextButton.styleFrom(foregroundColor: context.colors.danger),
             onPressed: () => Navigator.pop(d, true),
             child: const Text('Remove'),
           ),
         ],
       ),
     );
-    if (ok == true && context.mounted) await _run(context, () => cubit.remove(entry), close: true);
+    if (ok == true && context.mounted) {
+      await _run(context, () => cubit.remove(entry), close: true, done: 'Removed from library');
+    }
   }
 }
 
 class _StatusOption extends StatelessWidget {
   const _StatusOption({required this.status, required this.selected, required this.onTap});
+
   final ReadingStatus status;
   final bool selected;
   final VoidCallback onTap;
@@ -175,10 +186,10 @@ class _StatusOption extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: Space.xs),
     child: Material(
-      color: selected ? AppColors.accentSoft : AppColors.surface,
+      color: selected ? context.colors.accentSoft : context.colors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: Radii.card,
-        side: BorderSide(color: selected ? AppColors.accent : AppColors.border),
+        side: BorderSide(color: selected ? context.colors.accent : context.colors.border),
       ),
       child: InkWell(
         borderRadius: Radii.card,
@@ -190,13 +201,14 @@ class _StatusOption extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: 14),
             child: Row(
               children: [
-                Icon(statusIcons[status], color: AppColors.accent, size: 22),
+                Icon(statusIcons[status], color: context.colors.accent, size: 22),
                 const SizedBox(width: Space.sm),
                 Expanded(child: Text(status.label, style: Theme.of(context).textTheme.titleSmall)),
                 AnimatedOpacity(
                   opacity: selected ? 1 : 0,
                   duration: Motion.fast,
-                  child: const Icon(Icons.check_rounded, color: AppColors.accent),
+                  curve: Motion.curve,
+                  child: Icon(Icons.check_rounded, color: context.colors.accent),
                 ),
               ],
             ),

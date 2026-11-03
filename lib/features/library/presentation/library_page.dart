@@ -1,24 +1,26 @@
+import 'package:bookmarkd/app/router/app_router.dart';
+import 'package:bookmarkd/app/theme/app_theme.dart';
+import 'package:bookmarkd/app/theme/tokens.dart';
+import 'package:bookmarkd/core/errors/app_failure.dart';
+import 'package:bookmarkd/core/widgets/book_cover.dart';
+import 'package:bookmarkd/core/widgets/common.dart';
+import 'package:bookmarkd/core/widgets/rating_stars.dart';
+import 'package:bookmarkd/core/widgets/skeleton.dart';
+import 'package:bookmarkd/core/widgets/states.dart';
+import 'package:bookmarkd/features/library/domain/library_entry.dart';
+import 'package:bookmarkd/features/library/domain/library_query.dart';
+import 'package:bookmarkd/features/library/domain/reading_status.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../app/router/app_router.dart';
-import '../../../app/theme/app_theme.dart';
-import '../../../app/theme/tokens.dart';
-import '../../../core/widgets/book_cover.dart';
-import '../../../core/widgets/common.dart';
-import '../../../core/widgets/rating_stars.dart';
-import '../../../core/widgets/skeleton.dart';
-import '../../../core/widgets/states.dart';
-import '../domain/library_entry.dart';
-import '../domain/library_query.dart';
-import '../domain/reading_status.dart';
 import 'library_cubit.dart';
 import 'library_sheet.dart';
 
 class LibraryPage extends StatefulWidget {
   const LibraryPage({super.key});
+
   @override
   State<LibraryPage> createState() => _LibraryPageState();
 }
@@ -54,7 +56,13 @@ class _LibraryPageState extends State<LibraryPage> {
     return Scaffold(
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: context.read<LibraryCubit>().reload,
+          onRefresh: () async {
+            try {
+              await context.read<LibraryCubit>().reload();
+            } on AppFailure catch (e) {
+              if (context.mounted) showMessage(context, e.message);
+            }
+          },
           child: CustomScrollView(
             slivers: [
               SliverToBoxAdapter(child: _header(context, library.byId.length)),
@@ -68,13 +76,15 @@ class _LibraryPageState extends State<LibraryPage> {
   }
 
   Widget _header(BuildContext context, int total) => Padding(
-    padding: const EdgeInsets.fromLTRB(Space.gutter, Space.md, Space.xs, Space.xs),
+    padding: const EdgeInsets.fromLTRB(Space.gutter, 28, Space.xs, Space.xs),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Expanded(child: Text('Library', style: context.text.headlineMedium)),
+            Expanded(
+              child: Semantics(header: true, child: Text('Shelf', style: context.text.displaySmall)),
+            ),
             IconButton(
               tooltip: 'Search library',
               onPressed: () => setState(() {
@@ -99,10 +109,11 @@ class _LibraryPageState extends State<LibraryPage> {
         ),
         Text(
           '$total ${total == 1 ? 'book' : 'books'} · sorted by ${_query.sort.label.toLowerCase()}',
-          style: context.text.bodySmall,
+          style: context.text.bodySmall?.copyWith(color: context.colors.textSecondary),
         ),
         AnimatedSize(
           duration: Motion.normal,
+          curve: Motion.curve,
           child: _searching
               ? Padding(
                   padding: const EdgeInsets.only(top: Space.sm, right: Space.sm),
@@ -122,25 +133,55 @@ class _LibraryPageState extends State<LibraryPage> {
   );
 
   Widget _filters(Map<ReadingStatus, int> counts, int total) {
-    Widget chip(String label, int count, ReadingStatus? status) => Padding(
-      padding: const EdgeInsets.only(right: Space.xs),
-      child: ChoiceChip(
-        label: Text('$label  $count'),
-        selected: _query.status == status,
-        onSelected: (_) => setState(() => _query = _query.copyWith(status: () => status)),
+    Widget tab(String label, int count, ReadingStatus? status) {
+      final selected = _query.status == status;
+      final c = context.colors;
+      return Semantics(
+        selected: selected,
+        button: true,
+        child: InkWell(
+          onTap: () => setState(() => _query = _query.copyWith(status: () => status)),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: Space.xs),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: selected ? c.textPrimary : Colors.transparent, width: 2)),
+            ),
+            alignment: Alignment.center,
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(text: label),
+                  TextSpan(
+                    text: '  $count',
+                    style: TextStyle(color: c.textSecondary, fontFeatures: const [FontFeature.tabularFigures()]),
+                  ),
+                ],
+              ),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                color: selected ? c.textPrimary : c.textSecondary,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      height: 44,
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: context.colors.border)),
       ),
-    );
-    return SizedBox(
-      height: 48,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: Space.gutter, vertical: Space.xxs),
+        padding: const EdgeInsets.symmetric(horizontal: Space.gutter - Space.xs),
         children: [
-          chip('All', total, null),
-          chip('Reading', counts[ReadingStatus.reading]!, ReadingStatus.reading),
-          chip('Want to Read', counts[ReadingStatus.wantToRead]!, ReadingStatus.wantToRead),
-          chip('Finished', counts[ReadingStatus.finished]!, ReadingStatus.finished),
-          chip('DNF', counts[ReadingStatus.dnf]!, ReadingStatus.dnf),
+          tab('All', total, null),
+          tab('Reading', counts[ReadingStatus.reading]!, ReadingStatus.reading),
+          tab('Want to Read', counts[ReadingStatus.wantToRead]!, ReadingStatus.wantToRead),
+          tab('Finished', counts[ReadingStatus.finished]!, ReadingStatus.finished),
+          tab('DNF', counts[ReadingStatus.dnf]!, ReadingStatus.dnf),
         ],
       ),
     );
@@ -189,7 +230,7 @@ class _LibraryPageState extends State<LibraryPage> {
                   crossAxisCount: columns,
                   mainAxisSpacing: Space.lg,
                   crossAxisSpacing: Space.md,
-                  mainAxisExtent: width / coverAspectRatio + 26,
+                  mainAxisExtent: width / coverAspectRatio + 30,
                 ),
                 delegate: SliverChildBuilderDelegate(
                   (_, i) =>
@@ -213,6 +254,7 @@ class _LibraryPageState extends State<LibraryPage> {
 
 class _GridItem extends StatelessWidget {
   const _GridItem({super.key, required this.entry, required this.width, required this.onTap});
+
   final LibraryEntry entry;
   final double width;
   final VoidCallback onTap;
@@ -227,17 +269,25 @@ class _GridItem extends StatelessWidget {
           children: [
             BookCover(book: entry.book, width: width, onTap: onTap),
             if (entry.status == ReadingStatus.reading)
-              Positioned(left: 6, right: 6, bottom: 6, child: AppProgressBar(value: entry.progress, height: 4)),
+              Positioned(left: 6, right: 6, bottom: 6, child: AppProgressBar(value: entry.progress, height: 3)),
             if (entry.isFavorite)
               const Positioned(top: 6, right: 6, child: Icon(Icons.favorite_rounded, size: 16, color: Colors.white)),
           ],
         ),
         const SizedBox(height: 6),
         SizedBox(
-          height: 14,
+          height: 18,
           child: entry.rating != null
               ? RatingStars(stars: entry.rating!.stars, size: 12)
-              : Text(entry.status.shortLabel, style: context.text.labelSmall?.copyWith(letterSpacing: 0)),
+              : Text(
+                  entry.status == ReadingStatus.reading
+                      ? '${entry.status.shortLabel} · ${entry.progressPercentDisplay}%'
+                      : entry.status.shortLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textScaler: MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.2),
+                  style: context.text.bodySmall?.copyWith(color: context.colors.textSecondary, height: 1.3),
+                ),
         ),
       ],
     ),
@@ -246,6 +296,7 @@ class _GridItem extends StatelessWidget {
 
 class _ListItem extends StatelessWidget {
   const _ListItem({super.key, required this.entry, required this.onTap});
+
   final LibraryEntry entry;
   final VoidCallback onTap;
 
@@ -253,8 +304,12 @@ class _ListItem extends StatelessWidget {
   Widget build(BuildContext context) => InkWell(
     onTap: onTap,
     onLongPress: () => showLibrarySheet(context, entry.book),
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: Space.gutter, vertical: Space.sm),
+    child: Container(
+      margin: const EdgeInsets.symmetric(horizontal: Space.gutter),
+      padding: const EdgeInsets.symmetric(vertical: Space.sm),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: context.colors.border)),
+      ),
       child: Row(
         children: [
           BookCover(book: entry.book, width: 52),
@@ -263,13 +318,22 @@ class _ListItem extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(entry.book.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: context.text.titleMedium),
-                Text(entry.book.authorLine, maxLines: 1, style: context.text.bodySmall),
+                Text(
+                  entry.book.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.text.titleMedium?.prose.copyWith(fontSize: 18, height: 1.2),
+                ),
+                Text(
+                  entry.book.authorLine,
+                  maxLines: 1,
+                  style: context.text.bodySmall?.copyWith(color: context.colors.textSecondary),
+                ),
                 const SizedBox(height: Space.xs),
                 if (entry.status == ReadingStatus.reading)
                   Row(
                     children: [
-                      Expanded(child: AppProgressBar(value: entry.progress, height: 4)),
+                      Expanded(child: AppProgressBar(value: entry.progress, height: 3)),
                       const SizedBox(width: Space.xs),
                       Text('${entry.progressPercentDisplay}%', style: context.text.labelSmall),
                     ],
@@ -284,7 +348,7 @@ class _ListItem extends StatelessWidget {
           IconButton(
             tooltip: 'Shelf actions',
             onPressed: () => showLibrarySheet(context, entry.book),
-            icon: const Icon(Icons.more_horiz_rounded, color: AppColors.textSecondary),
+            icon: Icon(Icons.more_horiz_rounded, color: context.colors.textSecondary),
           ),
         ],
       ),

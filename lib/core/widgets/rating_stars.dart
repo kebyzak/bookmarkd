@@ -1,16 +1,14 @@
+import 'package:bookmarkd/app/theme/app_theme.dart';
+import 'package:bookmarkd/features/library/domain/rating.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../app/theme/tokens.dart';
-import '../../features/library/domain/rating.dart';
-
-/// Read-only stars for a 0–5 value.
 class RatingStars extends StatelessWidget {
-  const RatingStars({super.key, required this.stars, this.size = 14, this.color = AppColors.star});
+  const RatingStars({super.key, required this.stars, this.size = 14, this.color});
 
   final double stars;
   final double size;
-  final Color color;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) => Semantics(
@@ -25,16 +23,13 @@ class RatingStars extends StatelessWidget {
               : fill >= 0.25
               ? Icons.star_half_rounded
               : Icons.star_outline_rounded;
-          return Icon(icon, size: size, color: fill < 0.25 ? AppColors.border : color);
+          return Icon(icon, size: size, color: fill < 0.25 ? context.colors.starEmpty : color ?? context.colors.star);
         }),
       ),
     ),
   );
 }
 
-/// Half-star rating input: tap or drag across the stars.
-/// A drag only previews; [onChanged] fires once, when the finger lifts, so a
-/// swipe across the stars is one saved rating, not one per half star.
 class RatingInput extends StatefulWidget {
   const RatingInput({super.key, required this.value, required this.onChanged, this.size = 40});
 
@@ -47,11 +42,12 @@ class RatingInput extends StatefulWidget {
 }
 
 class _RatingInputState extends State<RatingInput> {
-  /// Half stars under the finger during a drag; null when not dragging.
   int? _dragging;
 
   Rating? get value => widget.value;
+
   ValueChanged<Rating?> get onChanged => widget.onChanged;
+
   double get size => widget.size;
 
   int _halvesAt(Offset local) => ((local.dx / size) * 2).ceil().clamp(1, 10);
@@ -59,7 +55,6 @@ class _RatingInputState extends State<RatingInput> {
   void _tap(Offset local) {
     final halves = _halvesAt(local);
     HapticFeedback.selectionClick();
-    // Tapping the current value clears it.
     onChanged(value?.halfStars == halves ? null : Rating.fromHalfStars(halves));
   }
 

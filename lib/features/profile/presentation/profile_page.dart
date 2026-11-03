@@ -1,31 +1,30 @@
+import 'package:bookmarkd/app/di.dart';
+import 'package:bookmarkd/app/router/app_router.dart';
+import 'package:bookmarkd/app/theme/app_theme.dart';
+import 'package:bookmarkd/app/theme/tokens.dart';
+import 'package:bookmarkd/core/errors/app_failure.dart';
+import 'package:bookmarkd/core/utils/formatters.dart';
+import 'package:bookmarkd/core/widgets/book_cover.dart';
+import 'package:bookmarkd/core/widgets/common.dart';
+import 'package:bookmarkd/core/widgets/skeleton.dart';
+import 'package:bookmarkd/core/widgets/states.dart';
+import 'package:bookmarkd/features/auth/presentation/session_cubit.dart';
+import 'package:bookmarkd/features/library/domain/library_entry.dart';
+import 'package:bookmarkd/features/library/domain/reading_status.dart';
+import 'package:bookmarkd/features/library/presentation/library_cubit.dart';
+import 'package:bookmarkd/features/profile/domain/profile.dart';
+import 'package:bookmarkd/features/reviews/presentation/review_tile.dart';
+import 'package:bookmarkd/features/statistics/domain/reading_stats.dart';
+import 'package:bookmarkd/features/statistics/presentation/stats_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../app/di.dart';
-import '../../../app/router/app_router.dart';
-import '../../../app/theme/app_theme.dart';
-import '../../../app/theme/tokens.dart';
-import '../../../core/errors/app_failure.dart';
-import '../../../core/utils/formatters.dart';
-import '../../../core/widgets/book_cover.dart';
-import '../../../core/widgets/common.dart';
-import '../../../core/widgets/skeleton.dart';
-import '../../../core/widgets/states.dart';
-import '../../auth/presentation/session_cubit.dart';
-import '../../library/domain/library_entry.dart';
-import '../../library/domain/reading_status.dart';
-import '../../library/presentation/library_cubit.dart';
-import '../../reviews/presentation/review_tile.dart';
-import '../../statistics/domain/reading_stats.dart';
-import '../../statistics/presentation/stats_widgets.dart';
-import '../domain/profile.dart';
 import 'profile_cubit.dart';
 
-/// The signed-in reader's profile when [userId] is null or theirs;
-/// otherwise another reader's.
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key, this.userId});
+
   final String? userId;
 
   @override
@@ -45,6 +44,7 @@ class ProfilePage extends StatelessWidget {
 
 class _ProfileView extends StatelessWidget {
   const _ProfileView({required this.isSelf, required this.showBack});
+
   final bool isSelf;
   final bool showBack;
 
@@ -52,27 +52,38 @@ class _ProfileView extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = context.watch<ProfileCubit>().state;
     final cubit = context.read<ProfileCubit>();
-    final libraryEntries = context.select<LibraryCubit, List<LibraryEntry>>((c) => c.state.entries);
-    // Own profile reflects the live library and session profile.
-    final entries = isSelf ? libraryEntries : state.entries;
+    final library = context.select<LibraryCubit, Map<String, LibraryEntry>>((c) => c.state.byId);
+    final entries = isSelf ? library.values.toList() : state.entries;
     final profile = isSelf ? context.select<SessionCubit, Profile?>((c) => c.profile) : state.profile;
 
+    final tab = isSelf && !showBack;
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: showBack,
-        title: Text(profile?.handle ?? ''),
-        actions: [if (isSelf) const _SelfMenu()],
-      ),
+      appBar: tab
+          ? null
+          : AppBar(
+              automaticallyImplyLeading: showBack,
+              title: Text(profile?.handle ?? ''),
+              actions: [if (isSelf) const _SelfMenu()],
+            ),
       body: switch (state.status) {
-        LoadStatus.failure => ErrorState(message: state.failure!.message, onRetry: cubit.load),
+        LoadStatus.failure => SafeArea(
+          child: ErrorState(message: state.failure!.message, onRetry: cubit.load),
+        ),
         LoadStatus.success when profile != null => RefreshIndicator(
           onRefresh: () async {
             await cubit.load();
-            if (isSelf && context.mounted) await context.read<LibraryCubit>().reload();
+            if (!isSelf || !context.mounted) return;
+            try {
+              await context.read<LibraryCubit>().reload();
+            } on AppFailure catch (e) {
+              if (context.mounted) showMessage(context, e.message);
+            }
           },
-          child: _ProfileContent(profile: profile, state: state, entries: entries, isSelf: isSelf),
+          child: _ProfileContent(profile: profile, state: state, entries: entries, isSelf: isSelf, tab: tab),
         ),
-        _ => const SingleChildScrollView(child: ListSkeleton(count: 3, leadingWidth: 72, leadingHeight: 72)),
+        _ => const SafeArea(
+          child: SingleChildScrollView(child: ListSkeleton(count: 3, leadingWidth: 72, leadingHeight: 72)),
+        ),
       },
     );
   }
@@ -115,11 +126,19 @@ class _SelfMenu extends StatelessWidget {
 }
 
 class _ProfileContent extends StatelessWidget {
-  const _ProfileContent({required this.profile, required this.state, required this.entries, required this.isSelf});
+  const _ProfileContent({
+    required this.profile,
+    required this.state,
+    required this.entries,
+    required this.isSelf,
+    required this.tab,
+  });
+
   final Profile profile;
   final ProfileState state;
   final List<LibraryEntry> entries;
   final bool isSelf;
+  final bool tab;
 
   @override
   Widget build(BuildContext context) {
@@ -134,6 +153,18 @@ class _ProfileContent extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.only(bottom: Space.xxl),
       children: [
+        if (tab)
+          Padding(
+            padding: EdgeInsets.fromLTRB(Space.gutter, MediaQuery.paddingOf(context).top + 28, Space.xs, Space.md),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Semantics(header: true, child: Text('You', style: context.text.displaySmall)),
+                ),
+                const _SelfMenu(),
+              ],
+            ),
+          ),
         _Header(profile: profile, state: state, isSelf: isSelf),
         if (hidden)
           const EmptyState(icon: Icons.lock_outline_rounded, title: 'This profile is private')
@@ -161,39 +192,49 @@ class _ProfileContent extends StatelessWidget {
               onTap: (b) => open(favorites.firstWhere((e) => e.book == b)),
             ),
           ],
-          SectionHeader(title: 'Reviews', subtitle: state.reviews.isEmpty ? null : '${state.reviews.length} written'),
+          SectionHeader(title: 'Reviews', subtitle: state.reviewCount == 0 ? null : '${state.reviewCount} written'),
           if (state.reviews.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
               child: Text(
                 isSelf ? 'Reviews you write will appear here.' : 'No reviews yet.',
-                style: context.text.bodyMedium?.copyWith(color: AppColors.textSecondary),
+                style: context.text.bodyMedium?.copyWith(color: context.colors.textSecondary),
               ),
             )
           else
-            ...state.reviews.take(5).map((r) => ReviewTile(key: ValueKey(r.id), review: r, showBook: true)),
+            for (final (i, r) in state.reviews.indexed) ...[
+              if (i > 0) const Divider(indent: Space.gutter, endIndent: Space.gutter),
+              ReviewTile(key: ValueKey(r.id), review: r, showBook: true),
+            ],
           const SectionHeader(title: 'Reading history'),
           if (finished.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
               child: Text(
                 'Finished books will appear here.',
-                style: context.text.bodyMedium?.copyWith(color: AppColors.textSecondary),
+                style: context.text.bodyMedium?.copyWith(color: context.colors.textSecondary),
               ),
             )
           else
-            ...finished
-                .take(20)
-                .map(
-                  (e) => ListTile(
-                    key: ValueKey(e.id),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: Space.gutter),
-                    leading: BookCover(book: e.book, width: 32),
-                    title: Text(e.book.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                    subtitle: Text(e.finishedAt == null ? 'Finished' : 'Finished ${formatDate(e.finishedAt!)}'),
-                    onTap: () => open(e),
-                  ),
+            for (final (i, e) in finished.take(20).indexed) ...[
+              if (i > 0) const Divider(indent: Space.gutter, endIndent: Space.gutter),
+              ListTile(
+                key: ValueKey(e.id),
+                contentPadding: const EdgeInsets.symmetric(horizontal: Space.gutter),
+                leading: BookCover(book: e.book, width: 32),
+                title: Text(
+                  e.book.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.text.titleMedium?.prose.copyWith(fontSize: 17),
                 ),
+                subtitle: Text(
+                  e.finishedAt == null ? 'Finished' : 'Finished ${formatDate(e.finishedAt!)}',
+                  style: context.text.bodySmall?.copyWith(color: context.colors.textSecondary),
+                ),
+                onTap: () => open(e),
+              ),
+            ],
         ],
       ],
     );
@@ -202,13 +243,28 @@ class _ProfileContent extends StatelessWidget {
 
 class _Header extends StatelessWidget {
   const _Header({required this.profile, required this.state, required this.isSelf});
+
   final Profile profile;
   final ProfileState state;
   final bool isSelf;
 
-  Future<void> _toggleFollow(BuildContext context) async {
+  Future<void> _toggleFollow(BuildContext context, {bool offerUndo = true}) async {
+    final cubit = context.read<ProfileCubit>();
+    final unfollowing = cubit.state.isFollowing;
     try {
-      await context.read<ProfileCubit>().toggleFollow();
+      await cubit.toggleFollow();
+      if (unfollowing && offerUndo && context.mounted) {
+        showMessage(
+          context,
+          'Unfollowed ${profile.handle}',
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () {
+              if (context.mounted) _toggleFollow(context, offerUndo: false);
+            },
+          ),
+        );
+      }
     } catch (e) {
       if (context.mounted) showMessage(context, AppFailure.from(e).message);
     }
@@ -230,9 +286,9 @@ class _Header extends StatelessWidget {
           ],
         ),
         const SizedBox(height: Space.md),
-        Text(profile.name, style: context.text.headlineSmall),
+        Text(profile.name, style: context.text.headlineMedium),
         if (profile.displayName?.isNotEmpty ?? false)
-          Text(profile.handle, style: context.text.bodyMedium?.copyWith(color: AppColors.textSecondary)),
+          Text(profile.handle, style: context.text.bodyMedium?.copyWith(color: context.colors.textSecondary)),
         if (profile.bio?.isNotEmpty ?? false) ...[
           const SizedBox(height: Space.xs),
           Text(profile.bio!, style: context.text.bodyMedium),
@@ -241,7 +297,15 @@ class _Header extends StatelessWidget {
         SizedBox(
           width: double.infinity,
           child: isSelf
-              ? OutlinedButton(onPressed: () => context.push(Routes.editProfile), child: const Text('Edit profile'))
+              ? OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: context.colors.accentSoft,
+                    foregroundColor: context.colors.accent,
+                    side: BorderSide(color: context.colors.accentSoft),
+                  ),
+                  onPressed: () => context.push(Routes.editProfile),
+                  child: const Text('Edit profile'),
+                )
               : state.isFollowing
               ? OutlinedButton(onPressed: () => _toggleFollow(context), child: const Text('Following'))
               : FilledButton(onPressed: () => _toggleFollow(context), child: const Text('Follow')),
@@ -253,6 +317,7 @@ class _Header extends StatelessWidget {
 
 class _Count extends StatelessWidget {
   const _Count({required this.value, required this.label});
+
   final int value;
   final String label;
 

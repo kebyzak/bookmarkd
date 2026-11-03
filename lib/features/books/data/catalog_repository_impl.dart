@@ -1,13 +1,12 @@
+import 'package:bookmarkd/core/errors/app_failure.dart';
+import 'package:bookmarkd/core/network/http_client.dart';
+import 'package:bookmarkd/core/repositories.dart';
+import 'package:bookmarkd/features/books/domain/book.dart';
+import 'package:bookmarkd/features/books/domain/catalog_query.dart';
 import 'package:dio/dio.dart';
 
-import '../../../core/errors/app_failure.dart';
-import '../../../core/network/http_client.dart';
-import '../../../core/repositories.dart';
-import '../domain/book.dart';
-import '../domain/catalog_query.dart';
 import 'catalog_parsers.dart';
 
-/// Google Books first; Open Library when Google fails (network, 5xx, 429).
 class HttpCatalogRepository implements CatalogRepository {
   HttpCatalogRepository(this._dio, {this.apiKey = ''});
 
@@ -15,8 +14,8 @@ class HttpCatalogRepository implements CatalogRepository {
   final String apiKey;
 
   @override
-  Future<List<Book>> search(CatalogQuery query, {int startIndex = 0}) async {
-    if (!query.isSearchable) return const [];
+  Future<CatalogPage> search(CatalogQuery query, {int startIndex = 0}) async {
+    if (!query.isSearchable) return (books: const <Book>[], fetched: 0);
     try {
       return await _searchGoogle(query, startIndex);
     } on AppFailure catch (googleFailure) {
@@ -37,15 +36,15 @@ class HttpCatalogRepository implements CatalogRepository {
     final value = catalogKey.substring(sep + 1);
     return switch (scheme) {
       'gb' => _googleVolume(value),
-      'isbn' => _first(await search(CatalogQuery.parse(value, mode: SearchMode.isbn))),
-      'ol' => _first(await _searchOpenLibrary(CatalogQuery.parse('key:/works/$value'), 0)),
+      'isbn' => _first((await search(CatalogQuery.parse(value, mode: SearchMode.isbn))).books),
+      'ol' => _first((await _searchOpenLibrary(CatalogQuery.parse('key:/works/$value'), 0)).books),
       _ => throw const AppFailure.notFound(),
     };
   }
 
   Book _first(List<Book> books) => books.isEmpty ? throw const AppFailure.notFound() : books.first;
 
-  Future<List<Book>> _searchGoogle(CatalogQuery query, int startIndex) async {
+  Future<CatalogPage> _searchGoogle(CatalogQuery query, int startIndex) async {
     final json = await _get('https://www.googleapis.com/books/v1/volumes', {
       'q': query.googleQuery,
       'startIndex': '$startIndex',
@@ -54,7 +53,7 @@ class HttpCatalogRepository implements CatalogRepository {
       if (apiKey.isNotEmpty) 'key': apiKey,
     });
     final items = (json['items'] as List?) ?? const [];
-    return dedupeBooks(items.whereType<Map<String, dynamic>>().map(parseGoogleVolume));
+    return (books: dedupeBooks(items.whereType<Map<String, dynamic>>().map(parseGoogleVolume)), fetched: items.length);
   }
 
   Future<Book> _googleVolume(String id) async {
@@ -62,7 +61,7 @@ class HttpCatalogRepository implements CatalogRepository {
     return parseGoogleVolume(json);
   }
 
-  Future<List<Book>> _searchOpenLibrary(CatalogQuery query, int startIndex) async {
+  Future<CatalogPage> _searchOpenLibrary(CatalogQuery query, int startIndex) async {
     final json = await _get('https://openlibrary.org/search.json', {
       ...query.openLibraryParams,
       'offset': '$startIndex',
@@ -72,7 +71,7 @@ class HttpCatalogRepository implements CatalogRepository {
           'cover_i,publisher,subject,language',
     });
     final docs = (json['docs'] as List?) ?? const [];
-    return dedupeBooks(docs.whereType<Map<String, dynamic>>().map(parseOpenLibraryDoc));
+    return (books: dedupeBooks(docs.whereType<Map<String, dynamic>>().map(parseOpenLibraryDoc)), fetched: docs.length);
   }
 
   Future<Map<String, dynamic>> _get(String url, Map<String, String> params) async {

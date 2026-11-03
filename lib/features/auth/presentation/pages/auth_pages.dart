@@ -1,14 +1,14 @@
+import 'package:bookmarkd/app/di.dart';
+import 'package:bookmarkd/app/theme/app_theme.dart';
+import 'package:bookmarkd/app/theme/tokens.dart';
+import 'package:bookmarkd/core/errors/app_failure.dart';
+import 'package:bookmarkd/core/repositories.dart';
+import 'package:bookmarkd/core/widgets/states.dart';
+import 'package:bookmarkd/features/auth/presentation/session_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../app/di.dart';
-import '../../../../app/theme/app_theme.dart';
-import '../../../../app/theme/tokens.dart';
-import '../../../../core/errors/app_failure.dart';
-import '../../../../core/repositories.dart';
-import '../../../../core/widgets/states.dart';
-import '../session_cubit.dart';
 import 'brand_mark.dart';
 
 final _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
@@ -35,7 +35,7 @@ class WelcomePage extends StatelessWidget {
             const SizedBox(height: Space.sm),
             Text(
               'Track your shelf, log your progress, and find your next book through friends.',
-              style: context.text.bodyLarge?.copyWith(color: AppColors.textSecondary),
+              style: context.text.bodyLarge?.copyWith(color: context.colors.textSecondary),
             ),
             const Spacer(flex: 2),
             FilledButton(
@@ -54,7 +54,6 @@ class WelcomePage extends StatelessWidget {
   );
 }
 
-/// Shared form chrome for the three auth screens.
 class _AuthScaffold extends StatelessWidget {
   const _AuthScaffold({required this.title, required this.subtitle, required this.formKey, required this.children});
 
@@ -74,7 +73,7 @@ class _AuthScaffold extends StatelessWidget {
           children: [
             Text(title, style: context.text.headlineMedium),
             const SizedBox(height: Space.xs),
-            Text(subtitle, style: context.text.bodyLarge?.copyWith(color: AppColors.textSecondary)),
+            Text(subtitle, style: context.text.bodyLarge?.copyWith(color: context.colors.textSecondary)),
             const SizedBox(height: Space.xl),
             ...children,
           ],
@@ -84,7 +83,6 @@ class _AuthScaffold extends StatelessWidget {
   );
 }
 
-/// Runs an auth call with a busy flag and shows failures. Returns true on success.
 mixin _Submitting<T extends StatefulWidget> on State<T> {
   bool busy = false;
 
@@ -105,6 +103,7 @@ mixin _Submitting<T extends StatefulWidget> on State<T> {
 
 class _SubmitButton extends StatelessWidget {
   const _SubmitButton({required this.label, required this.busy, required this.onPressed});
+
   final String label;
   final bool busy;
   final VoidCallback onPressed;
@@ -114,7 +113,11 @@ class _SubmitButton extends StatelessWidget {
     onPressed: busy ? null : onPressed,
     child: Center(
       child: busy
-          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+          ? SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2, color: context.colors.onAccent),
+            )
           : Text(label),
     ),
   );
@@ -122,6 +125,7 @@ class _SubmitButton extends StatelessWidget {
 
 class _PasswordField extends StatefulWidget {
   const _PasswordField({required this.controller, required this.validator, this.onSubmitted, this.newPassword = false});
+
   final TextEditingController controller;
   final FormFieldValidator<String> validator;
   final VoidCallback? onSubmitted;
@@ -165,6 +169,7 @@ Widget _emailField(TextEditingController c) => TextFormField(
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
+
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
@@ -181,7 +186,6 @@ class _LoginPageState extends State<LoginPage> with _Submitting {
     super.dispose();
   }
 
-  // On success the session stream changes and the router redirects.
   void _go() {
     if (!_form.currentState!.validate()) return;
     submit(() => sl<AuthRepository>().signIn(email: _email.text, password: _password.text));
@@ -222,6 +226,7 @@ class _LoginPageState extends State<LoginPage> with _Submitting {
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
+
   @override
   State<RegisterPage> createState() => _RegisterPageState();
 }
@@ -293,6 +298,7 @@ class _RegisterPageState extends State<RegisterPage> with _Submitting {
 
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});
+
   @override
   State<ForgotPasswordPage> createState() => _ForgotPasswordPageState();
 }
@@ -335,9 +341,9 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> with _Submittin
   );
 }
 
-/// Shown after opening a password-reset link; the user is signed in by the link.
 class ResetPasswordPage extends StatefulWidget {
   const ResetPasswordPage({super.key});
+
   @override
   State<ResetPasswordPage> createState() => _ResetPasswordPageState();
 }

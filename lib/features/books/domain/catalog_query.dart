@@ -5,10 +5,10 @@ enum SearchMode {
   isbn('ISBN');
 
   const SearchMode(this.label);
+
   final String label;
 }
 
-/// A user's search, normalized once. ISBN-looking input is always searched as ISBN.
 class CatalogQuery {
   const CatalogQuery._(this.text, this.mode);
 
@@ -34,7 +34,6 @@ class CatalogQuery {
     SearchMode.isbn => 'isbn:$text',
   };
 
-  /// Query parameters for Open Library's `/search.json`.
   Map<String, String> get openLibraryParams => switch (mode) {
     SearchMode.any => {'q': text},
     SearchMode.title => {'title': text},
@@ -43,5 +42,4 @@ class CatalogQuery {
   };
 }
 
-/// Results per catalog page, shared by the API client and pagination logic.
 const catalogPageSize = 20;

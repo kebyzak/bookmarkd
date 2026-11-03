@@ -1,8 +1,6 @@
 import 'library_entry.dart';
 import 'reading_status.dart';
 
-/// The single rule for what changing a reading status does to an entry.
-/// Applying the same status twice changes nothing.
 LibraryEntry transitionStatus(LibraryEntry entry, ReadingStatus to, {required DateTime today}) {
   if (entry.status == to) return entry;
   final date = DateTime(today.year, today.month, today.day);

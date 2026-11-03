@@ -1,10 +1,9 @@
+import 'package:bookmarkd/features/books/domain/book.dart';
 import 'package:equatable/equatable.dart';
 
-import '../../books/domain/book.dart';
 import 'rating.dart';
 import 'reading_status.dart';
 
-/// One user's relationship with one work. See docs/ARCHITECTURE.md.
 class LibraryEntry extends Equatable {
   const LibraryEntry({
     required this.id,
@@ -22,8 +21,6 @@ class LibraryEntry extends Equatable {
 
   final String id;
   final String userId;
-
-  /// Always a stored book: [Book.id] and [Book.editionId] are set.
   final Book book;
   final ReadingStatus status;
   final int? currentPage;
@@ -34,7 +31,6 @@ class LibraryEntry extends Equatable {
   final DateTime? finishedAt;
   final DateTime addedAt;
 
-  /// Fraction 0..1 for progress bars. Finished books are always complete.
   double get progress {
     if (status == ReadingStatus.finished) return 1;
     final pages = book.pageCount;

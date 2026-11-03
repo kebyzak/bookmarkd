@@ -1,6 +1,5 @@
 import 'package:intl/intl.dart';
 
-/// "just now", "5m", "3h", "2d", then a date. [now] is injectable for tests.
 String relativeTime(DateTime time, {DateTime? now}) {
   final diff = (now ?? DateTime.now()).difference(time);
   if (diff.inMinutes < 1) return 'just now';
