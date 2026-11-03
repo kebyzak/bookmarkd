@@ -74,9 +74,8 @@ class BookCarousel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6);
     return SizedBox(
-      height: coverWidth / coverAspectRatio + 72 * scale,
+      height: BookTile.heightWithoutCaption(context, coverWidth),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: Space.gutter),

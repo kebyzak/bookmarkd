@@ -3,12 +3,14 @@ import 'dart:async';
 import 'package:bookmarkd/features/auth/presentation/pages/auth_pages.dart';
 import 'package:bookmarkd/features/auth/presentation/pages/splash_page.dart';
 import 'package:bookmarkd/features/auth/presentation/session_cubit.dart';
+import 'package:bookmarkd/features/books/presentation/author_page.dart';
 import 'package:bookmarkd/features/books/presentation/book_details_page.dart';
 import 'package:bookmarkd/features/home/presentation/home_page.dart';
 import 'package:bookmarkd/features/library/presentation/library_page.dart';
 import 'package:bookmarkd/features/onboarding/presentation/onboarding_page.dart';
 import 'package:bookmarkd/features/profile/presentation/edit_profile_page.dart';
 import 'package:bookmarkd/features/profile/presentation/profile_page.dart';
+import 'package:bookmarkd/features/profile/presentation/readers_page.dart';
 import 'package:bookmarkd/features/reading/presentation/reading_progress_page.dart';
 import 'package:bookmarkd/features/reviews/presentation/write_review_page.dart';
 import 'package:bookmarkd/features/search/presentation/search_page.dart';
@@ -27,7 +29,14 @@ abstract final class Routes {
   static String review(String key) => '${book(key)}/review';
 
   static String user(String id) => '/users/$id';
+
+  static String followers(String id) => '${user(id)}/followers';
+
+  static String following(String id) => '${user(id)}/following';
+
+  static String author(String name) => '/authors/${Uri.encodeComponent(name)}';
   static const editProfile = '/profile/edit';
+  static const notifications = '/notifications';
 }
 
 final _rootKey = GlobalKey<NavigatorState>();
@@ -81,8 +90,26 @@ GoRouter createRouter(SessionCubit session, {required Listenable refresh}) {
       ),
       GoRoute(path: '/activity', builder: (_, _) => const ActivityPage()),
       GoRoute(
+        path: Routes.notifications,
+        builder: (_, _) => const ReadersPage(list: ReaderList.notifications),
+      ),
+      GoRoute(
+        path: '/authors/:name',
+        builder: (_, s) => AuthorPage(name: s.pathParameters['name']!),
+      ),
+      GoRoute(
         path: '/users/:userId',
         builder: (_, s) => ProfilePage(userId: s.pathParameters['userId']),
+        routes: [
+          GoRoute(
+            path: 'followers',
+            builder: (_, s) => ReadersPage(list: ReaderList.followers, userId: s.pathParameters['userId']),
+          ),
+          GoRoute(
+            path: 'following',
+            builder: (_, s) => ReadersPage(list: ReaderList.following, userId: s.pathParameters['userId']),
+          ),
+        ],
       ),
     ],
   );

@@ -4,7 +4,6 @@ import 'package:bookmarkd/core/repositories.dart';
 import 'package:bookmarkd/features/books/domain/book.dart';
 import 'package:bookmarkd/features/library/domain/library_entry.dart';
 import 'package:bookmarkd/features/library/domain/reading_status.dart';
-import 'package:bookmarkd/features/library/domain/status_transition.dart';
 import 'package:bookmarkd/features/reading/domain/progress_update.dart';
 import 'package:bookmarkd/features/reading/domain/reading_session.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -25,16 +24,11 @@ class SupabaseLibraryRepository implements LibraryRepository {
   });
 
   @override
-  Future<LibraryEntry> add(Book storedBook, ReadingStatus status) => guardSupabase(() async {
+  Future<LibraryEntry> add(Book storedBook, LibraryEntry Function(LibraryEntry blank) shape) => guardSupabase(() async {
     final userId = _client.auth.currentUser!.id;
-    final blank = LibraryEntry(
-      id: '',
-      userId: userId,
-      book: storedBook,
-      status: ReadingStatus.wantToRead,
-      addedAt: DateTime.now(),
+    final initial = shape(
+      LibraryEntry(id: '', userId: userId, book: storedBook, status: ReadingStatus.wantToRead, addedAt: DateTime.now()),
     );
-    final initial = transitionStatus(blank, status, today: DateTime.now());
     final row = await _client
         .from('user_books')
         .upsert({

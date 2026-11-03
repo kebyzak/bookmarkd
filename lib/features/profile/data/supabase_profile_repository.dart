@@ -80,4 +80,69 @@ class SupabaseProfileRepository implements ProfileRepository, SocialRepository {
   @override
   Future<void> unfollow(String otherUserId) =>
       guardSupabase(() => _client.from('follows').delete().eq('follower_id', _me).eq('followee_id', otherUserId));
+
+  static const _listLimit = 200;
+
+  @override
+  Future<List<ReaderLink>> followers(String userId) => _links(
+    _client
+        .from('follows')
+        .select('created_at, profile:profiles!follows_follower_id_fkey(*)')
+        .eq('followee_id', userId)
+        .order('created_at', ascending: false)
+        .limit(_listLimit),
+  );
+
+  @override
+  Future<List<ReaderLink>> following(String userId) => _links(
+    _client
+        .from('follows')
+        .select('created_at, profile:profiles!follows_followee_id_fkey(*)')
+        .eq('follower_id', userId)
+        .order('created_at', ascending: false)
+        .limit(_listLimit),
+  );
+
+  @override
+  Future<List<ReaderLink>> followNotifications() => _links(
+    _client
+        .from('notifications')
+        .select('created_at, read_at, profile:profiles!notifications_actor_id_fkey(*)')
+        .eq('user_id', _me)
+        .eq('type', 'follow')
+        .order('created_at', ascending: false)
+        .limit(50),
+  );
+
+  @override
+  Future<int> unreadNotificationCount() =>
+      guardSupabase(() => _client.from('notifications').count().eq('user_id', _me).isFilter('read_at', null));
+
+  @override
+  Future<void> markNotificationsRead() => guardSupabase(
+    () => _client
+        .from('notifications')
+        .update({'read_at': DateTime.now().toUtc().toIso8601String()})
+        .eq('user_id', _me)
+        .isFilter('read_at', null),
+  );
+
+  Future<List<ReaderLink>> _links(Future<List<Map<String, dynamic>>> query) => guardSupabase(() async {
+    final rows = await query;
+    final profiles = [for (final r in rows) Profile.fromJson((r['profile'] as Map).cast<String, dynamic>())];
+    final followed = profiles.isEmpty
+        ? const <String>{}
+        : (await _client.from('follows').select('followee_id').eq('follower_id', _me).inFilter('followee_id', [
+            for (final p in profiles) p.id,
+          ])).map((r) => r['followee_id'] as String).toSet();
+    return [
+      for (final (i, r) in rows.indexed)
+        ReaderLink(
+          profile: profiles[i],
+          following: followed.contains(profiles[i].id),
+          at: DateTime.parse(r['created_at'] as String),
+          unread: r.containsKey('read_at') && r['read_at'] == null,
+        ),
+    ];
+  });
 }

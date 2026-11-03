@@ -91,9 +91,9 @@ class _LibrarySheet extends StatelessWidget {
               status: status,
               selected: entry?.status == status,
               onTap: () {
-                if (entry != null && status == ReadingStatus.finished) {
+                if (status == ReadingStatus.finished) {
                   Navigator.of(context).pop();
-                  showFinishSheet(parent, entry);
+                  showFinishSheet(parent, entry?.book ?? book);
                   return;
                 }
                 _run(

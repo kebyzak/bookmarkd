@@ -58,7 +58,9 @@ class SearchState extends Equatable {
 }
 
 class SearchCubit extends Cubit<SearchState> {
-  SearchCubit(this._catalog) : super(const SearchState());
+  SearchCubit(this._catalog, {this.author}) : super(const SearchState());
+
+  final String? author;
 
   static const debounce = Duration(milliseconds: 300);
 
@@ -74,7 +76,7 @@ class SearchCubit extends Cubit<SearchState> {
 
   void queryChanged(String text) {
     _timer?.cancel();
-    if (!CatalogQuery.parse(text).isSearchable) {
+    if (!CatalogQuery.parse(text, author: author).isSearchable) {
       _generation++;
       emit(SearchState(text: text, mode: state.mode));
       return;
@@ -87,7 +89,7 @@ class SearchCubit extends Cubit<SearchState> {
     if (mode == state.mode) return;
     emit(state.copyWith(mode: mode));
     _timer?.cancel();
-    if (CatalogQuery.parse(state.text).isSearchable) _run(state.text, mode);
+    if (CatalogQuery.parse(state.text, author: author).isSearchable) _run(state.text, mode);
   }
 
   Future<void> retry() => _run(state.text, state.mode);
@@ -96,7 +98,7 @@ class SearchCubit extends Cubit<SearchState> {
     final generation = ++_generation;
     emit(state.copyWith(status: LoadStatus.loading, loadingMore: false, loadMoreFailed: false, failure: () => null));
     try {
-      final page = await _catalog.search(CatalogQuery.parse(text, mode: mode));
+      final page = await _catalog.search(CatalogQuery.parse(text, mode: mode, author: author));
       if (generation != _generation || isClosed) return;
       emit(
         state.copyWith(
@@ -118,7 +120,10 @@ class SearchCubit extends Cubit<SearchState> {
     final generation = _generation;
     emit(state.copyWith(loadingMore: true, loadMoreFailed: false));
     try {
-      final page = await _catalog.search(CatalogQuery.parse(state.text, mode: state.mode), startIndex: state.nextIndex);
+      final page = await _catalog.search(
+        CatalogQuery.parse(state.text, mode: state.mode, author: author),
+        startIndex: state.nextIndex,
+      );
       if (generation != _generation || isClosed) return;
       final known = state.results.map((b) => b.key).toSet();
       emit(

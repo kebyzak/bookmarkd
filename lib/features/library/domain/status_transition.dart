@@ -17,13 +17,36 @@ LibraryEntry transitionStatus(LibraryEntry entry, ReadingStatus to, {required Da
       startedAt: () => entry.startedAt ?? date,
       finishedAt: () => null,
     ),
-    ReadingStatus.finished => entry.copyWith(
-      status: to,
-      startedAt: () => entry.startedAt ?? date,
-      finishedAt: () => entry.finishedAt ?? date,
-      currentPage: () => entry.book.pageCount ?? entry.currentPage,
-      progressPercent: () => 100,
-    ),
+    ReadingStatus.finished => finishOn(entry, ReadOn(entry.finishedAt ?? date)),
     ReadingStatus.dnf => entry.copyWith(status: to, finishedAt: () => null),
   };
+}
+
+sealed class FinishDate {
+  const FinishDate();
+}
+
+final class ReadOn extends FinishDate {
+  const ReadOn(this.day);
+
+  final DateTime day;
+}
+
+final class ReadSometimeAgo extends FinishDate {
+  const ReadSometimeAgo();
+}
+
+LibraryEntry finishOn(LibraryEntry entry, FinishDate when) {
+  final day = switch (when) {
+    ReadOn(:final day) => DateTime(day.year, day.month, day.day),
+    ReadSometimeAgo() => null,
+  };
+  final started = entry.startedAt;
+  return entry.copyWith(
+    status: ReadingStatus.finished,
+    startedAt: () => day != null && (started == null || started.isAfter(day)) ? day : started,
+    finishedAt: () => day,
+    currentPage: () => entry.book.pageCount ?? entry.currentPage,
+    progressPercent: () => 100,
+  );
 }

@@ -146,7 +146,7 @@ class _SearchViewState extends State<_SearchView> {
                     onOpen: _open,
                     onFindReaders: () => setState(() => _scope = _Scope.readers),
                   ),
-                  (_Scope.books, true) => _BookResults(key: const ValueKey('results'), state: search, onOpen: _open),
+                  (_Scope.books, true) => BookResults(key: const ValueKey('results'), state: search, onOpen: _open),
                 },
               ),
             ),
@@ -157,11 +157,12 @@ class _SearchViewState extends State<_SearchView> {
   }
 }
 
-class _BookResults extends StatelessWidget {
-  const _BookResults({super.key, required this.state, required this.onOpen});
+class BookResults extends StatelessWidget {
+  const BookResults({super.key, required this.state, required this.onOpen, this.emptyMessage});
 
   final SearchState state;
   final ValueChanged<Book> onOpen;
+  final String? emptyMessage;
 
   @override
   Widget build(BuildContext context) => switch (state.status) {
@@ -177,9 +178,11 @@ class _BookResults extends StatelessWidget {
     LoadStatus.success when state.results.isEmpty => EmptyState(
       icon: Icons.search_off_rounded,
       title: 'No books found',
-      message: state.mode == SearchMode.any
-          ? 'Try a different spelling, or search by author or ISBN.'
-          : 'Try searching across all fields.',
+      message:
+          emptyMessage ??
+          (state.mode == SearchMode.any
+              ? 'Try a different spelling, or search by author or ISBN.'
+              : 'Try searching across all fields.'),
     ),
     LoadStatus.success => _list(context),
   };

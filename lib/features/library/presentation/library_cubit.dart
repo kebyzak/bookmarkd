@@ -85,16 +85,21 @@ class LibraryCubit extends Cubit<LibraryState> {
     emit(const LibraryState());
   }
 
-  Future<LibraryEntry> add(Book book, ReadingStatus status) async {
+  Future<LibraryEntry> add(Book book, ReadingStatus status) =>
+      _addOrUpdate(book, (e) => transitionStatus(e, status, today: _clock()));
+
+  Future<LibraryEntry> finish(Book book, FinishDate when) => _addOrUpdate(book, (e) => finishOn(e, when));
+
+  Future<LibraryEntry> _addOrUpdate(Book book, LibraryEntry Function(LibraryEntry) shape) async {
     final existing = state.entryFor(book);
     if (existing != null) {
-      await setStatus(existing, status);
+      await _optimistic(shape(existing));
       return state.byId[existing.id]!;
     }
     final key = book.key;
     final pending = _adding[key];
     if (pending != null) return pending;
-    final future = _insert(book, status).whenComplete(() {
+    final future = _insert(book, shape).whenComplete(() {
       _adding.remove(key);
       if (!isClosed) emit(state.copyWith(adding: _adding.keys.toSet()));
     });
@@ -105,9 +110,9 @@ class LibraryCubit extends Cubit<LibraryState> {
 
   final _adding = <String, Future<LibraryEntry>>{};
 
-  Future<LibraryEntry> _insert(Book book, ReadingStatus status) async {
+  Future<LibraryEntry> _insert(Book book, LibraryEntry Function(LibraryEntry) shape) async {
     final stored = await _books.save(book);
-    final entry = await _library.add(stored, status);
+    final entry = await _library.add(stored, shape);
     _put(entry);
     return entry;
   }

@@ -7,9 +7,11 @@ import 'package:bookmarkd/core/widgets/book_cover.dart';
 import 'package:bookmarkd/core/widgets/rating_stars.dart';
 import 'package:bookmarkd/core/widgets/states.dart';
 import 'package:bookmarkd/features/auth/presentation/session_cubit.dart';
+import 'package:bookmarkd/features/books/domain/book.dart';
 import 'package:bookmarkd/features/library/domain/library_entry.dart';
 import 'package:bookmarkd/features/library/domain/rating.dart';
 import 'package:bookmarkd/features/library/domain/reading_status.dart';
+import 'package:bookmarkd/features/library/domain/status_transition.dart';
 import 'package:bookmarkd/features/library/presentation/library_cubit.dart';
 import 'package:bookmarkd/features/reviews/domain/review.dart';
 import 'package:flutter/material.dart';
@@ -17,7 +19,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
-Future<void> showFinishSheet(BuildContext context, LibraryEntry entry) {
+Future<void> showFinishSheet(BuildContext context, Book book) {
   HapticFeedback.heavyImpact();
   final cubit = context.read<LibraryCubit>();
   final goal = context.read<SessionCubit>().profile?.readingGoal;
@@ -26,18 +28,29 @@ Future<void> showFinishSheet(BuildContext context, LibraryEntry entry) {
       fullscreenDialog: true,
       builder: (_) => BlocProvider.value(
         value: cubit,
-        child: _FinishPage(entry: entry, goal: goal, parent: context),
+        child: _FinishPage(book: book, goal: goal, parent: context),
       ),
     ),
+  );
+}
+
+Future<DateTime?> pickFinishDate(BuildContext context, DateTime initial) {
+  final today = DateUtils.dateOnly(DateTime.now());
+  return showDatePicker(
+    context: context,
+    initialDate: initial.isAfter(today) ? today : initial,
+    firstDate: DateTime(1900),
+    lastDate: today,
+    helpText: 'Finished on',
   );
 }
 
 const _ratingWords = ['Not for me', 'It was fine', 'Good', 'Really good', 'A favourite'];
 
 class _FinishPage extends StatefulWidget {
-  const _FinishPage({required this.entry, required this.goal, required this.parent});
+  const _FinishPage({required this.book, required this.goal, required this.parent});
 
-  final LibraryEntry entry;
+  final Book book;
   final int? goal;
   final BuildContext parent;
 
@@ -47,23 +60,28 @@ class _FinishPage extends StatefulWidget {
 
 class _FinishPageState extends State<_FinishPage> {
   late final DateTime _today = DateUtils.dateOnly(DateTime.now());
-  late Rating? _rating = widget.entry.rating;
+  late final LibraryEntry? _entry = context.read<LibraryCubit>().state.entryFor(widget.book);
+  late DateTime _day = _today;
+  late bool? _counted = _entry?.status == ReadingStatus.reading ? true : null;
+  late Rating? _rating = _entry?.rating;
   final _note = TextEditingController();
+  late final Future<Review?> _existingReview = widget.book.id == null
+      ? Future.value()
+      : sl<ReviewRepository>().mine(widget.book.id!).then((r) => r, onError: (_) => null);
 
-  late final Future<Review?> _existingReview = sl<ReviewRepository>()
-      .mine(widget.entry.book.id!)
-      .then((r) => r, onError: (_) => null);
-
-  late final List<LibraryEntry> _earlier =
+  List<LibraryEntry> _earlierIn(int year) =>
       context
           .read<LibraryCubit>()
           .state
           .entries
-          .where(
-            (e) => e.id != widget.entry.id && e.status == ReadingStatus.finished && e.finishedAt?.year == _today.year,
-          )
+          .where((e) => e.id != _entry?.id && e.status == ReadingStatus.finished && e.finishedAt?.year == year)
           .toList()
         ..sort((a, b) => a.finishedAt!.compareTo(b.finishedAt!));
+
+  Future<void> _changeDate() async {
+    final picked = await pickFinishDate(context, _day);
+    if (picked != null && mounted) setState(() => _day = picked);
+  }
 
   @override
   void dispose() {
@@ -74,16 +92,18 @@ class _FinishPageState extends State<_FinishPage> {
   Future<void> _save({required bool withRating}) async {
     final cubit = context.read<LibraryCubit>();
     final parent = widget.parent;
-    final id = widget.entry.id;
+    final when = _counted! ? ReadOn(_day) : const ReadSometimeAgo();
+    final added = _entry == null;
     final rating = _rating;
     final note = _note.text.trim();
     Navigator.of(context).pop();
     try {
-      await cubit.setStatus(cubit.state.byId[id] ?? widget.entry, ReadingStatus.finished);
+      final saved = await cubit.finish(widget.book, when);
+      if (added && parent.mounted) showMessage(parent, 'Added to ${ReadingStatus.finished.label}');
       if (!withRating) return;
-      if (rating != widget.entry.rating) await cubit.rate(cubit.state.byId[id]!, rating);
+      if (rating != saved.rating) await cubit.rate(cubit.state.byId[saved.id] ?? saved, rating);
       if (note.isNotEmpty) {
-        await sl<ReviewRepository>().upsert(bookId: widget.entry.book.id!, body: note, containsSpoilers: false);
+        await sl<ReviewRepository>().upsert(bookId: saved.book.id!, body: note, containsSpoilers: false);
       }
     } catch (e) {
       if (parent.mounted) showMessage(parent, AppFailure.from(e).message);
@@ -93,17 +113,23 @@ class _FinishPageState extends State<_FinishPage> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final book = widget.entry.book;
-    final number = _earlier.length + 1;
-    final goal = widget.goal;
-    final started = widget.entry.startedAt;
-    final days = started == null ? null : _today.difference(DateUtils.dateOnly(started)).inDays + 1;
+    final book = widget.book;
+    final counted = _counted == true;
+    final year = _day.year;
+    final earlier = counted ? _earlierIn(year) : const <LibraryEntry>[];
+    final number = earlier.length + 1;
+    final goal = counted && year == _today.year ? widget.goal : null;
+    final started = _entry?.startedAt;
+    final days = !counted || started == null || started.isAfter(_day)
+        ? null
+        : _day.difference(DateUtils.dateOnly(started)).inDays + 1;
     final pages = book.pageCount;
     final span = [
       if (pages != null) '$pages pages',
       if (days != null) 'over $days ${days == 1 ? 'day' : 'days'}',
     ].join(' ');
     final left = goal == null ? null : goal - number;
+    final dateLabel = DateFormat(year == _today.year ? 'd MMMM' : 'd MMMM y').format(_day);
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
 
     return Scaffold(
@@ -122,7 +148,7 @@ class _FinishPageState extends State<_FinishPage> {
                   ),
                   Expanded(
                     child: Text(
-                      'Finished · ${DateFormat('d MMMM').format(_today)}'.toUpperCase(),
+                      (counted ? 'Finished · $dateLabel' : 'Finished').toUpperCase(),
                       textAlign: TextAlign.center,
                       style: context.text.labelSmall?.copyWith(
                         fontWeight: FontWeight.w600,
@@ -169,10 +195,18 @@ class _FinishPageState extends State<_FinishPage> {
                     const SizedBox(height: 18),
                     Semantics(
                       header: true,
-                      child: Text(
-                        'Book $number of ${_today.year}',
-                        textAlign: TextAlign.center,
-                        style: context.text.displaySmall,
+                      child: AnimatedSwitcher(
+                        duration: Motion.fast,
+                        child: Text(
+                          switch (_counted) {
+                            true => 'Book $number of $year',
+                            false => 'Read some time ago',
+                            null => 'Finished',
+                          },
+                          key: ValueKey('$_counted|$year|$number'),
+                          textAlign: TextAlign.center,
+                          style: context.text.displaySmall,
+                        ),
                       ),
                     ),
                     const SizedBox(height: Space.sm),
@@ -180,13 +214,33 @@ class _FinishPageState extends State<_FinishPage> {
                       [
                         span.isEmpty ? book.title : '${book.title}, $span.',
                         if (left != null) left > 0 ? '$left to go for your goal.' : 'You reached your goal of $goal.',
+                        if (_counted == false) "On your shelf, outside any year's goal.",
                       ].join('\n'),
                       textAlign: TextAlign.center,
                       style: context.text.bodyMedium?.copyWith(color: c.textSecondary, height: 1.45),
                     ),
+                    if (counted) ...[
+                      const SizedBox(height: Space.lg),
+                      _MiniShelf(earlier: earlier, current: book, year: year),
+                    ],
                     const SizedBox(height: Space.lg),
-                    _MiniShelf(earlier: _earlier, current: widget.entry, year: _today.year),
-                    const SizedBox(height: 26),
+                    _Choice(
+                      icon: Icons.event_available_outlined,
+                      title: year == _today.year && widget.goal != null
+                          ? 'Count toward my $year goal'
+                          : 'Count in my $year reading',
+                      subtitle: counted ? 'Finished $dateLabel · Change date' : 'Finished today, or pick the day',
+                      selected: counted,
+                      onTap: counted ? _changeDate : () => setState(() => _counted = true),
+                    ),
+                    _Choice(
+                      icon: Icons.history_rounded,
+                      title: 'Read some time ago',
+                      subtitle: 'No date needed. Not counted in any year.',
+                      selected: _counted == false,
+                      onTap: () => setState(() => _counted = false),
+                    ),
+                    const SizedBox(height: Space.lg),
                     Semantics(
                       header: true,
                       child: Text('How was it?', textAlign: TextAlign.center, style: context.text.titleLarge),
@@ -243,13 +297,17 @@ class _FinishPageState extends State<_FinishPage> {
                       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
                       textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                     ),
-                    onPressed: () => _save(withRating: true),
-                    child: Text('Save to my ${_today.year}'),
+                    onPressed: _counted == null ? null : () => _save(withRating: true),
+                    child: Text(switch (_counted) {
+                      true => 'Save to my $year',
+                      false => 'Save to Finished',
+                      null => 'Choose how to save it',
+                    }),
                   ),
                   const SizedBox(height: Space.xxs),
                   TextButton(
                     style: TextButton.styleFrom(minimumSize: const Size.fromHeight(44)),
-                    onPressed: () => _save(withRating: false),
+                    onPressed: _counted == null ? null : () => _save(withRating: false),
                     child: const Text('Rate it later'),
                   ),
                 ],
@@ -262,11 +320,78 @@ class _FinishPageState extends State<_FinishPage> {
   }
 }
 
+class _Choice extends StatelessWidget {
+  const _Choice({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Space.xs),
+      child: Material(
+        color: selected ? c.accentSoft : c.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: Radii.card,
+          side: BorderSide(color: selected ? c.accent : c.border),
+        ),
+        child: InkWell(
+          borderRadius: Radii.card,
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onTap();
+          },
+          child: Semantics(
+            selected: selected,
+            button: true,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: 12),
+              child: Row(
+                children: [
+                  Icon(icon, color: c.accent, size: 22),
+                  const SizedBox(width: Space.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title, style: context.text.titleSmall),
+                        const SizedBox(height: 2),
+                        Text(subtitle, style: context.text.bodySmall?.copyWith(color: c.textSecondary)),
+                      ],
+                    ),
+                  ),
+                  AnimatedOpacity(
+                    opacity: selected ? 1 : 0,
+                    duration: Motion.fast,
+                    curve: Motion.curve,
+                    child: Icon(Icons.check_rounded, color: c.accent),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _MiniShelf extends StatelessWidget {
   const _MiniShelf({required this.earlier, required this.current, required this.year});
 
   final List<LibraryEntry> earlier;
-  final LibraryEntry current;
+  final Book current;
   final int year;
   static const _max = 14;
 
@@ -275,14 +400,14 @@ class _MiniShelf extends StatelessWidget {
     final c = context.colors;
     final shown = earlier.length > _max - 1 ? earlier.sublist(earlier.length - (_max - 1)) : earlier;
 
-    Widget spine(LibraryEntry e, {bool isNew = false}) {
-      final width = ((e.book.pageCount ?? 300) / 60).clamp(10.0, 19.0);
-      final height = 48.0 + e.book.title.length * 7 % 14;
+    Widget spine(Book b, {bool isNew = false}) {
+      final width = ((b.pageCount ?? 300) / 60).clamp(10.0, 19.0);
+      final height = 48.0 + b.title.length * 7 % 14;
       final box = Container(
         width: width,
         height: height,
         decoration: BoxDecoration(
-          color: coverTone(e.book.title),
+          color: coverTone(b.title),
           borderRadius: const BorderRadius.vertical(top: Radius.circular(2)),
         ),
       );
@@ -310,7 +435,7 @@ class _MiniShelf extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.end,
-            children: [for (final e in shown) spine(e), spine(current, isNew: true)],
+            children: [for (final e in shown) spine(e.book), spine(current, isNew: true)],
           ),
         ),
       ),

@@ -144,8 +144,17 @@ class _ProfileContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final stats = ReadingStats.compute(entries, now: DateTime.now(), goal: profile.readingGoal);
     final finished = entries.where((e) => e.status == ReadingStatus.finished).toList()
-      ..sort((a, b) => (b.finishedAt ?? b.addedAt).compareTo(a.finishedAt ?? a.addedAt));
+      ..sort(
+        (a, b) => switch ((a.finishedAt, b.finishedAt)) {
+          (final x?, final y?) => y.compareTo(x),
+          (_?, null) => -1,
+          (null, _?) => 1,
+          (null, null) => b.addedAt.compareTo(a.addedAt),
+        },
+      );
     final favorites = entries.where((e) => e.isFavorite).toList();
+    final reading = entries.where((e) => e.status == ReadingStatus.reading).toList()
+      ..sort((a, b) => (b.startedAt ?? b.addedAt).compareTo(a.startedAt ?? a.addedAt));
     final hidden = !isSelf && profile.isPrivate;
 
     void open(LibraryEntry e) => context.push(Routes.book(e.book.id!));
@@ -178,6 +187,13 @@ class _ProfileContent extends StatelessWidget {
               ],
             ),
           ),
+          if (reading.isNotEmpty) ...[
+            const SectionHeader(title: 'Currently reading'),
+            for (final (i, e) in reading.indexed) ...[
+              if (i > 0) const Divider(indent: Space.gutter, endIndent: Space.gutter),
+              _ReadingProgressTile(key: ValueKey(e.id), entry: e, onTap: () => open(e)),
+            ],
+          ],
           if (finished.isNotEmpty) ...[
             const SectionHeader(title: 'Recently finished'),
             BookCarousel(
@@ -206,12 +222,18 @@ class _ProfileContent extends StatelessWidget {
               if (i > 0) const Divider(indent: Space.gutter, endIndent: Space.gutter),
               ReviewTile(key: ValueKey(r.id), review: r, showBook: true),
             ],
-          const SectionHeader(title: 'Reading history'),
+          SectionHeader(
+            title: 'Reading history',
+            actionLabel: isSelf ? 'Add a past read' : null,
+            onAction: () => context.go('/search'),
+          ),
           if (finished.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
               child: Text(
-                'Finished books will appear here.',
+                isSelf
+                    ? 'Finished books will appear here. Mark a book Finished to pick the date you read it.'
+                    : 'Finished books will appear here.',
                 style: context.text.bodyMedium?.copyWith(color: context.colors.textSecondary),
               ),
             )
@@ -229,7 +251,7 @@ class _ProfileContent extends StatelessWidget {
                   style: context.text.titleMedium?.prose.copyWith(fontSize: 17),
                 ),
                 subtitle: Text(
-                  e.finishedAt == null ? 'Finished' : 'Finished ${formatDate(e.finishedAt!)}',
+                  e.finishedAt == null ? 'Read some time ago' : 'Finished ${formatDate(e.finishedAt!)}',
                   style: context.text.bodySmall?.copyWith(color: context.colors.textSecondary),
                 ),
                 onTap: () => open(e),
@@ -247,6 +269,13 @@ class _Header extends StatelessWidget {
   final Profile profile;
   final ProfileState state;
   final bool isSelf;
+
+  bool get hidden => !isSelf && profile.isPrivate;
+
+  Future<void> _openList(BuildContext context, String route) async {
+    await context.push(route);
+    if (context.mounted) await context.read<ProfileCubit>().load();
+  }
 
   Future<void> _toggleFollow(BuildContext context, {bool offerUndo = true}) async {
     final cubit = context.read<ProfileCubit>();
@@ -279,10 +308,17 @@ class _Header extends StatelessWidget {
         Row(
           children: [
             AppAvatar(profile: profile, size: 76),
-            const SizedBox(width: Space.lg),
-            _Count(value: state.counts.followers, label: 'Followers'),
-            const SizedBox(width: Space.lg),
-            _Count(value: state.counts.following, label: 'Following'),
+            const SizedBox(width: Space.md),
+            _Count(
+              value: state.counts.followers,
+              label: 'Followers',
+              onTap: hidden ? null : () => _openList(context, Routes.followers(profile.id)),
+            ),
+            _Count(
+              value: state.counts.following,
+              label: 'Following',
+              onTap: hidden ? null : () => _openList(context, Routes.following(profile.id)),
+            ),
           ],
         ),
         const SizedBox(height: Space.md),
@@ -315,21 +351,86 @@ class _Header extends StatelessWidget {
   );
 }
 
+class _ReadingProgressTile extends StatelessWidget {
+  const _ReadingProgressTile({super.key, required this.entry, required this.onTap});
+
+  final LibraryEntry entry;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: Space.gutter, vertical: Space.sm),
+      child: Row(
+        children: [
+          BookCover(book: entry.book, width: 44),
+          const SizedBox(width: Space.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  entry.book.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.text.titleMedium?.prose.copyWith(fontSize: 17),
+                ),
+                Text(
+                  entry.book.authorLine,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.text.bodySmall?.copyWith(color: context.colors.textSecondary),
+                ),
+                const SizedBox(height: Space.xs),
+                Semantics(
+                  label: entry.progressLabel,
+                  child: ExcludeSemantics(child: AppProgressBar(value: entry.progress, height: 4)),
+                ),
+                const SizedBox(height: Space.xxs),
+                ExcludeSemantics(
+                  child: Text(
+                    entry.progressLabel,
+                    style: context.text.bodySmall?.copyWith(
+                      color: context.colors.textSecondary,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 class _Count extends StatelessWidget {
-  const _Count({required this.value, required this.label});
+  const _Count({required this.value, required this.label, this.onTap});
 
   final int value;
   final String label;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) => Semantics(
     label: '$value $label',
+    button: onTap != null,
+    onTap: onTap,
     child: ExcludeSemantics(
-      child: Column(
-        children: [
-          Text(formatCount(value), style: context.text.titleLarge),
-          Text(label, style: context.text.bodySmall),
-        ],
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: Radii.card,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: Space.xs, vertical: Space.xxs),
+          child: Column(
+            children: [
+              Text(formatCount(value), style: context.text.titleLarge),
+              Text(label, style: context.text.bodySmall),
+            ],
+          ),
+        ),
       ),
     ),
   );

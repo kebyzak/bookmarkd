@@ -3,6 +3,7 @@ import 'package:bookmarkd/app/router/app_router.dart';
 import 'package:bookmarkd/app/theme/app_theme.dart';
 import 'package:bookmarkd/app/theme/tokens.dart';
 import 'package:bookmarkd/core/errors/app_failure.dart';
+import 'package:bookmarkd/core/utils/formatters.dart';
 import 'package:bookmarkd/core/widgets/book_cover.dart';
 import 'package:bookmarkd/core/widgets/common.dart';
 import 'package:bookmarkd/core/widgets/skeleton.dart';
@@ -24,7 +25,8 @@ class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
   @override
-  Widget build(BuildContext context) => BlocProvider(create: (_) => HomeCubit(sl(), sl()), child: const _HomeView());
+  Widget build(BuildContext context) =>
+      BlocProvider(create: (_) => HomeCubit(sl(), sl(), sl()), child: const _HomeView());
 }
 
 class _HomeView extends StatefulWidget {
@@ -79,16 +81,38 @@ class _HomeViewState extends State<_HomeView> {
             padding: const EdgeInsets.only(bottom: Space.xxl),
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(Space.gutter, 28, Space.gutter, Space.xxs),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                padding: const EdgeInsets.fromLTRB(Space.gutter, 28, Space.xs, Space.xxs),
+                child: Row(
                   children: [
-                    Text(
-                      DateFormat('EEEE, d MMMM').format(now),
-                      style: context.text.bodySmall?.copyWith(color: context.colors.textSecondary),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            DateFormat('EEEE, d MMMM').format(now),
+                            style: context.text.bodySmall?.copyWith(color: context.colors.textSecondary),
+                          ),
+                          const SizedBox(height: Space.xxs),
+                          Semantics(header: true, child: Text('Reading', style: context.text.displaySmall)),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: Space.xxs),
-                    Semantics(header: true, child: Text('Reading', style: context.text.displaySmall)),
+                    IconButton(
+                      tooltip: home.unreadNotifications == 0
+                          ? 'Notifications'
+                          : 'Notifications, ${home.unreadNotifications} new',
+                      onPressed: () async {
+                        final cubit = context.read<HomeCubit>();
+                        await context.push(Routes.notifications);
+                        cubit.notificationsSeen();
+                      },
+                      icon: Badge(
+                        isLabelVisible: home.unreadNotifications > 0,
+                        backgroundColor: context.colors.accent,
+                        label: Text(formatCount(home.unreadNotifications)),
+                        child: Icon(Icons.notifications_none_rounded, color: context.colors.textPrimary),
+                      ),
+                    ),
                   ],
                 ),
               ),

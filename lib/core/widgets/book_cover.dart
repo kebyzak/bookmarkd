@@ -131,6 +131,27 @@ class _PressableState extends State<_Pressable> {
 class BookTile extends StatelessWidget {
   const BookTile({super.key, required this.book, required this.width, this.onTap, this.caption});
 
+  static const _titleLines = 2;
+  static const _lineHeight = 1.4;
+  static const _authorSpacing = 2.0;
+
+  static TextStyle _titleStyle(BuildContext context) =>
+      (Theme.of(context).textTheme.titleSmall ?? const TextStyle(fontSize: 14)).serif.copyWith(height: _lineHeight);
+
+  static TextStyle _authorStyle(BuildContext context) =>
+      (Theme.of(context).textTheme.bodySmall ?? const TextStyle(fontSize: 12)).copyWith(height: _lineHeight);
+
+  static double heightWithoutCaption(BuildContext context, double width) {
+    final scaler = MediaQuery.textScalerOf(context);
+    final titleHeight = scaler.scale(_titleStyle(context).fontSize!) * _lineHeight * _titleLines;
+    final authorHeight = scaler.scale(_authorStyle(context).fontSize!) * _lineHeight;
+    return width / coverAspectRatio +
+        Space.xs +
+        titleHeight.ceilToDouble() +
+        _authorSpacing +
+        authorHeight.ceilToDouble();
+  }
+
   final Book book;
   final double width;
   final VoidCallback? onTap;
@@ -138,7 +159,8 @@ class BookTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
+    final titleStyle = _titleStyle(context);
+    final authorStyle = _authorStyle(context);
     return SizedBox(
       width: width,
       child: Column(
@@ -146,9 +168,21 @@ class BookTile extends StatelessWidget {
         children: [
           BookCover(book: book, width: width, onTap: onTap),
           const SizedBox(height: Space.xs),
-          Text(book.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: text.titleSmall?.serif),
-          const SizedBox(height: 2),
-          Text(book.authorLine, maxLines: 1, overflow: TextOverflow.ellipsis, style: text.bodySmall),
+          Text(
+            book.title,
+            maxLines: _titleLines,
+            overflow: TextOverflow.ellipsis,
+            style: titleStyle,
+            strutStyle: StrutStyle.fromTextStyle(titleStyle, forceStrutHeight: true),
+          ),
+          const SizedBox(height: _authorSpacing),
+          Text(
+            book.authorLine,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: authorStyle,
+            strutStyle: StrutStyle.fromTextStyle(authorStyle, forceStrutHeight: true),
+          ),
           if (caption != null) ...[const SizedBox(height: Space.xxs), caption!],
         ],
       ),

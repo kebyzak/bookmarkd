@@ -4,7 +4,6 @@ import 'package:bookmarkd/features/books/domain/book.dart';
 import 'package:bookmarkd/features/books/domain/book_stats.dart';
 import 'package:bookmarkd/features/books/domain/catalog_query.dart';
 import 'package:bookmarkd/features/library/domain/library_entry.dart';
-import 'package:bookmarkd/features/library/domain/reading_status.dart';
 import 'package:bookmarkd/features/profile/domain/profile.dart';
 import 'package:bookmarkd/features/reading/domain/progress_update.dart';
 import 'package:bookmarkd/features/reading/domain/reading_session.dart';
@@ -51,6 +50,16 @@ abstract interface class SocialRepository {
   Future<void> follow(String otherUserId);
 
   Future<void> unfollow(String otherUserId);
+
+  Future<List<ReaderLink>> followers(String userId);
+
+  Future<List<ReaderLink>> following(String userId);
+
+  Future<List<ReaderLink>> followNotifications();
+
+  Future<int> unreadNotificationCount();
+
+  Future<void> markNotificationsRead();
 }
 
 typedef CatalogPage = ({List<Book> books, int fetched});
@@ -78,7 +87,7 @@ abstract interface class BookRepository {
 abstract interface class LibraryRepository {
   Future<List<LibraryEntry>> getLibrary(String userId);
 
-  Future<LibraryEntry> add(Book storedBook, ReadingStatus status);
+  Future<LibraryEntry> add(Book storedBook, LibraryEntry Function(LibraryEntry blank) shape);
 
   Future<LibraryEntry> update(LibraryEntry entry);
 

@@ -90,7 +90,7 @@ class _LogSheetState extends State<_LogSheet> {
     try {
       final saved = await cubit.logProgress(widget.entry, update);
       if (update.isComplete && saved.status != ReadingStatus.finished && parent.mounted) {
-        await showFinishSheet(parent, saved);
+        await showFinishSheet(parent, saved.book);
       }
     } catch (e) {
       if (parent.mounted) showMessage(parent, AppFailure.from(e).message);

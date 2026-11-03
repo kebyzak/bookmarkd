@@ -222,7 +222,33 @@ class _Header extends StatelessWidget {
                         Text(book.subtitle!, style: context.text.bodySmall?.copyWith(color: c.textSecondary)),
                       ],
                       const SizedBox(height: Space.xxs),
-                      Text(book.authorLine, style: context.text.bodyLarge),
+                      if (book.authors.isEmpty)
+                        Text(book.authorLine, style: context.text.bodyLarge)
+                      else
+                        Wrap(
+                          children: [
+                            for (final (i, author) in book.authors.indexed)
+                              Semantics(
+                                link: true,
+                                label: 'Books by $author',
+                                child: ExcludeSemantics(
+                                  child: InkWell(
+                                    onTap: () => context.push(Routes.author(author)),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: Space.xxs),
+                                      child: Text(
+                                        i < book.authors.length - 1 ? '$author, ' : author,
+                                        style: context.text.bodyLarge?.copyWith(
+                                          decoration: TextDecoration.underline,
+                                          decorationColor: c.border,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       if (facts.isNotEmpty) ...[
                         const SizedBox(height: Space.xxs),
                         Text(
@@ -333,7 +359,7 @@ class _ActionBar extends StatelessWidget {
           pages != null && entry.currentPage != null
               ? 'p. ${entry.currentPage} · ${entry.progressPercentDisplay}%'
               : '${entry.progressPercentDisplay}%',
-        ReadingStatus.finished => entry.finishedAt == null ? null : formatDate(entry.finishedAt!),
+        ReadingStatus.finished => entry.finishedAt == null ? 'some time ago' : formatDate(entry.finishedAt!),
         _ => null,
       };
       content = Row(

@@ -40,6 +40,12 @@ class LibraryEntry extends Equatable {
 
   int get progressPercentDisplay => (progress * 100).round();
 
+  String get progressLabel {
+    final pages = book.pageCount;
+    if (currentPage != null && pages != null) return 'Page $currentPage of $pages · $progressPercentDisplay%';
+    return progressPercentDisplay == 0 ? 'Not started' : '$progressPercentDisplay%';
+  }
+
   LibraryEntry copyWith({
     ReadingStatus? status,
     int? Function()? currentPage,

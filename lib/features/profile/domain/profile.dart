@@ -79,6 +79,21 @@ class Profile extends Equatable {
   List<Object?> get props => [id, username, displayName, bio, avatarUrl, readingGoal, isPrivate, onboarded];
 }
 
+class ReaderLink extends Equatable {
+  const ReaderLink({required this.profile, required this.following, required this.at, this.unread = false});
+
+  final Profile profile;
+  final bool following;
+  final DateTime at;
+  final bool unread;
+
+  ReaderLink copyWith({required bool following}) =>
+      ReaderLink(profile: profile, following: following, at: at, unread: unread);
+
+  @override
+  List<Object?> get props => [profile, following, at, unread];
+}
+
 class FollowCounts extends Equatable {
   const FollowCounts({required this.followers, required this.following});
 
