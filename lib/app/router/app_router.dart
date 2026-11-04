@@ -62,6 +62,7 @@ GoRouter createRouter(SessionCubit session, {required Listenable refresh}) {
           _branch('/library', const LibraryPage()),
           _branch('/search', const SearchPage()),
           StatefulShellBranch(
+            preload: true,
             routes: [
               GoRoute(
                 path: '/profile',
@@ -116,6 +117,7 @@ GoRouter createRouter(SessionCubit session, {required Listenable refresh}) {
 }
 
 StatefulShellBranch _branch(String path, Widget page) => StatefulShellBranch(
+  preload: true,
   routes: [GoRoute(path: path, builder: (_, _) => page)],
 );
 
