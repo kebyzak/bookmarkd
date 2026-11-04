@@ -11,8 +11,8 @@ insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-00000000000b', 'other@test.local');
 update public.profiles set is_private = true where id = '00000000-0000-0000-0000-00000000000a';
 
-insert into public.books (id, title, work_key)
-  values ('00000000-0000-0000-0000-0000000000b1', 'Secret Book', 'secret book|');
+insert into public.books (id, title)
+  values ('00000000-0000-0000-0000-0000000000b1', 'Secret Book');
 insert into public.book_editions (id, book_id, isbn_13)
   values ('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000b1', '9780000000001');
 -- Inserting the entry also emits an activity through the trigger.
@@ -24,7 +24,18 @@ insert into public.reviews (user_id, book_id, body)
 
 -- Act as the other user.
 set local role authenticated;
-select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000b","role":"authenticated"}', true);
+
+select set_config(
+  'request.jwt.claim.sub',
+  '00000000-0000-0000-0000-00000000000b',
+  true
+);
+
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"00000000-0000-0000-0000-00000000000b","role":"authenticated"}',
+  true
+);
 
 select is((select count(*)::int from public.user_books), 0, 'others cannot see a private library');
 select is((select count(*)::int from public.reviews), 0, 'others cannot see private reviews');
@@ -39,8 +50,18 @@ select throws_ok(
   '42501', null, 'clients cannot write catalog books directly');
 
 -- Act as the owner.
-select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated"}', true);
+select set_config(
+  'request.jwt.claim.sub',
+  '00000000-0000-0000-0000-00000000000a',
+  true
+);
+
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated"}',
+  true
+);
 select is((select count(*)::int from public.user_books), 1, 'the owner still sees their own library');
 
-select * from finish();
+select * from finish(true);
 rollback;

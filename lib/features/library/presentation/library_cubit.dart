@@ -112,6 +112,8 @@ class LibraryCubit extends Cubit<LibraryState> {
 
   Future<LibraryEntry> _insert(Book book, LibraryEntry Function(LibraryEntry) shape) async {
     final stored = await _books.save(book);
+    final existing = state.entryFor(stored);
+    if (existing != null) return existing;
     final entry = await _library.add(stored, shape);
     _put(entry);
     return entry;

@@ -2,6 +2,7 @@
 // server, so clients cannot write made-up titles or covers into the shared
 // `books` table. Mirrors lib/features/books/data/catalog_parsers.dart.
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { olHeaders, workIdForIsbn } from "../_shared/open_library.ts";
 
 const url = Deno.env.get("SUPABASE_URL")!;
 const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -36,10 +37,13 @@ async function fromGoogle(id: string): Promise<Payload | null> {
   const cover = clean(info.imageLinks?.thumbnail ?? info.imageLinks?.smallThumbnail);
   const title = clean(info.title);
   if (!title) return null;
+  const i10 = isbn10(isbn("ISBN_10"));
+  const i13 = isbn13(isbn("ISBN_13"));
   return {
     google_books_id: body.id,
-    isbn_10: isbn10(isbn("ISBN_10")),
-    isbn_13: isbn13(isbn("ISBN_13")),
+    open_library_work_id: await workIdForIsbn(i13, i10),
+    isbn_10: i10,
+    isbn_13: i13,
     title,
     subtitle: clean(info.subtitle),
     authors: strings(info.authors),
@@ -55,11 +59,27 @@ async function fromGoogle(id: string): Promise<Payload | null> {
   };
 }
 
+// Search results carry no description; the work record does. Optional, so failures give null.
+async function workDescription(workId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`https://openlibrary.org/works/${workId}.json`, {
+      headers: olHeaders,
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    const d = (await res.json()).description;
+    return clean(d && typeof d === "object" ? d.value : d);
+  } catch {
+    return null;
+  }
+}
+
 async function fromOpenLibrary(workId: string): Promise<Payload | null> {
+  const description = workDescription(workId);
   const fields = "key,title,subtitle,author_name,first_publish_year,isbn,number_of_pages_median,cover_i,publisher,subject,language";
   const res = await fetch(
     `https://openlibrary.org/search.json?q=${encodeURIComponent(`key:/works/${workId}`)}&fields=${fields}&limit=1`,
-    { headers: { "User-Agent": "Bookmarkd/1.0 (support@bookmarkd.app)" } },
+    { headers: olHeaders },
   );
   if (!res.ok) return null;
   const doc = (await res.json()).docs?.[0];
@@ -68,11 +88,13 @@ async function fromOpenLibrary(workId: string): Promise<Payload | null> {
   const isbns = strings(doc.isbn) as string[];
   return {
     open_library_id: workId,
+    open_library_work_id: workId,
     isbn_13: isbn13(isbns.find((i) => i.length === 13)),
     isbn_10: isbn10(isbns.find((i) => i.length === 10)),
     title,
     subtitle: clean(doc.subtitle),
     authors: strings(doc.author_name),
+    description: await description,
     cover_url: typeof doc.cover_i === "number" ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg?default=false` : null,
     publisher: strings(doc.publisher)[0] ?? null,
     published_date: typeof doc.first_publish_year === "number" ? `${doc.first_publish_year}` : null,

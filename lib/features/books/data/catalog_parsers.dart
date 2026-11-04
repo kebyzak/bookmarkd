@@ -28,7 +28,7 @@ Book parseGoogleVolume(Map<String, dynamic> json) {
   );
 }
 
-Book parseOpenLibraryDoc(Map<String, dynamic> json) {
+Book parseOpenLibraryDoc(Map<String, dynamic> json, {Map<String, dynamic>? work}) {
   final isbns = _stringList(json['isbn']);
   final coverId = json['cover_i'];
   final year = json['first_publish_year'];
@@ -42,6 +42,7 @@ Book parseOpenLibraryDoc(Map<String, dynamic> json) {
     ),
     title: _clean(json['title']) ?? 'Untitled',
     subtitle: _clean(json['subtitle']),
+    description: _openLibraryDescription(work),
     authors: _stringList(json['author_name']),
     coverUrl: coverId is int ? 'https://covers.openlibrary.org/b/id/$coverId-L.jpg?default=false' : null,
     publisher: _stringList(json['publisher']).firstOrNull,
@@ -50,6 +51,11 @@ Book parseOpenLibraryDoc(Map<String, dynamic> json) {
     categories: _stringList(json['subject']).take(3).toList(),
     language: _stringList(json['language']).firstOrNull,
   );
+}
+
+String? _openLibraryDescription(Map<String, dynamic>? work) {
+  final d = work?['description'];
+  return _clean(d is Map ? d['value'] : d);
 }
 
 List<Book> dedupeBooks(Iterable<Book> books) {

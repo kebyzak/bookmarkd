@@ -17,15 +17,12 @@ class HttpCatalogRepository implements CatalogRepository {
   Future<CatalogPage> search(CatalogQuery query, {int startIndex = 0}) async {
     if (!query.isSearchable) return (books: const <Book>[], fetched: 0);
     try {
-      return await _searchGoogle(query, startIndex);
-    } on AppFailure catch (googleFailure) {
-      if (googleFailure.kind == FailureKind.unknown) rethrow;
-      try {
-        return await _searchOpenLibrary(query, startIndex);
-      } on AppFailure {
-        throw googleFailure;
-      }
+      final page = await _searchOpenLibrary(query, startIndex);
+      if (page.fetched > 0 || startIndex > 0) return page;
+    } on AppFailure catch (failure) {
+      if (failure.kind == FailureKind.unknown) rethrow;
     }
+    return _searchGoogle(query, startIndex);
   }
 
   @override
@@ -37,7 +34,7 @@ class HttpCatalogRepository implements CatalogRepository {
     return switch (scheme) {
       'gb' => _googleVolume(value),
       'isbn' => _first((await search(CatalogQuery.parse(value, mode: SearchMode.isbn))).books),
-      'ol' => _first((await _searchOpenLibrary(CatalogQuery.parse('key:/works/$value'), 0)).books),
+      'ol' => _openLibraryWork(value),
       _ => throw const AppFailure.notFound(),
     };
   }
@@ -61,17 +58,34 @@ class HttpCatalogRepository implements CatalogRepository {
     return parseGoogleVolume(json);
   }
 
+  static const _olFields =
+      'key,title,subtitle,author_name,first_publish_year,isbn,number_of_pages_median,'
+      'cover_i,publisher,subject,language';
+
   Future<CatalogPage> _searchOpenLibrary(CatalogQuery query, int startIndex) async {
     final json = await _get('https://openlibrary.org/search.json', {
       ...query.openLibraryParams,
       'offset': '$startIndex',
       'limit': '$catalogPageSize',
-      'fields':
-          'key,title,subtitle,author_name,first_publish_year,isbn,number_of_pages_median,'
-          'cover_i,publisher,subject,language',
+      'fields': _olFields,
     });
     final docs = (json['docs'] as List?) ?? const [];
     return (books: dedupeBooks(docs.whereType<Map<String, dynamic>>().map(parseOpenLibraryDoc)), fetched: docs.length);
+  }
+
+  Future<Book> _openLibraryWork(String id) async {
+    final work = _get(
+      'https://openlibrary.org/works/$id.json',
+      const {},
+    ).then<Map<String, dynamic>?>((w) => w, onError: (Object _) => null);
+    final json = await _get('https://openlibrary.org/search.json', {
+      'q': 'key:/works/$id',
+      'fields': _olFields,
+      'limit': '1',
+    });
+    final doc = ((json['docs'] as List?) ?? const []).whereType<Map<String, dynamic>>().firstOrNull;
+    if (doc == null) throw const AppFailure.notFound();
+    return parseOpenLibraryDoc(doc, work: await work);
   }
 
   Future<Map<String, dynamic>> _get(String url, Map<String, String> params) async {

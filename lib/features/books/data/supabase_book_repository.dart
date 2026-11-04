@@ -32,8 +32,11 @@ class SupabaseBookRepository implements BookRepository {
         .or(filters.join(','))
         .limit(1)
         .maybeSingle();
-    if (edition == null) return null;
-    return bookFromRows((edition['work'] as Map).cast<String, dynamic>(), edition);
+    if (edition != null) return bookFromRows((edition['work'] as Map).cast<String, dynamic>(), edition);
+    if (ids.openLibraryId == null) return null;
+    final work = await _oneEdition(_client.from('books').select(_select).eq('open_library_work_id', ids.openLibraryId!))
+        .maybeSingle();
+    return work == null ? null : _fromRow(work);
   });
 
   @override

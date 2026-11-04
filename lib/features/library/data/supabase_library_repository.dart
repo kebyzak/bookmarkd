@@ -31,12 +31,12 @@ class SupabaseLibraryRepository implements LibraryRepository {
     );
     final row = await _client
         .from('user_books')
-        .upsert({
+        .insert({
           'user_id': userId,
           'book_id': storedBook.id,
           'edition_id': storedBook.editionId,
           ...entryToUpdateRow(initial),
-        }, onConflict: 'user_id,book_id')
+        })
         .select(userBookSelect)
         .single();
     return entryFromRow(row);
